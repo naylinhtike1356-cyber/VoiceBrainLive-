@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_gradient">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:paddingTop="20dp"
+        android:background="@color/assistant_surface"
+        android:elevation="4dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="@color/white"
+            android:contentDescription="@string/desc_back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="အသံမက်ခရိုများ (Voice Macros)"
+            android:textColor="@color/assistant_text"
+            android:textSize="20sp"
+            android:fontFamily="sans-serif-medium" />
+
+        <ImageButton
+            android:id="@+id/btnVoiceCreate"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_mic_modern"
+            app:tint="@color/assistant_primary_light"
+            android:contentDescription="Create by Voice"
+            android:layout_marginEnd="8dp" />
+
+        <ImageButton
+            android:id="@+id/btnAddMacro"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="@color/white"
+            android:contentDescription="Add Macro" />
+    </LinearLayout>
+
+    <!-- Voice Guide Card -->
+    <LinearLayout
+        android:id="@+id/layoutVoiceGuide"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_action_card"
+        android:layout_margin="16dp"
+        android:padding="16dp"
+        android:visibility="visible">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎙️ အသံဖြင့် မက်ခရိုဆောက်နည်း"
+                android:textColor="@color/assistant_primary_light"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-medium"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true" />
+
+            <ImageButton
+                android:id="@+id/btnDismissGuide"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="@color/assistant_text_secondary"
+                android:contentDescription="Close Guide"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true" />
+        </RelativeLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="အပေါ်ရှိ မိုက်ခရိုဖုန်းခလုတ်ကို နှိပ်ပြီး Gemini Assistant အား အောက်ပါအတိုင်း ပြော၍ မက်ခရိုအသစ်ကို အလွယ်တကူ ဆောက်ခိုင်းနိုင်သည် -"
+            android:textColor="@color/assistant_text"
+            android:textSize="13sp"
+            android:layout_marginTop="8dp"
+            android:lineSpacingExtra="3dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="• 'ငါ အိပ်တော့မယ် လို့ပြောရင် ဖုန်းကို Silent လုပ်ပြီး ဓာတ်မီးပိတ်ပေး'\n• 'ငါ အလုပ်လုပ်မယ် လို့ပြောရင် focus mode ၃၀ မိနစ်ဖွင့်ပြီး အသံပိတ်ပေး'"
+            android:textColor="@color/assistant_secondary"
+            android:textSize="13sp"
+            android:layout_marginTop="8dp"
+            android:lineSpacingExtra="4dp"
+            android:fontFamily="sans-serif" />
+
+        <Button
+            android:id="@+id/btnTryVoiceCreate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="အသံဖြင့် စမ်းသပ်ဆောက်ကြည့်ရန်"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:backgroundTint="@color/assistant_primary"
+            android:layout_marginTop="12dp"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:padding="32dp"
+        android:text="မက်ခရိုများ မရှိသေးပါ။\nဥပမာ- 'create_macro' ဟုခေါ်ပြီး အသံဖြင့် ဆောက်နိုင်ပါသည်။"
+        android:textColor="@color/assistant_text_muted"
+        android:textSize="15sp"
+        android:lineSpacingExtra="4dp"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerMacros"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp"
+        android:clipToPadding="false" />
+</LinearLayout>
+

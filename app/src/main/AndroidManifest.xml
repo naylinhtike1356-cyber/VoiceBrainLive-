@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-sdk tools:overrideLibrary="androidx.health.connect.client" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Health Connect read access; user must grant these in Health Connect/Samsung Health. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    
+    <!-- v2.0 Call Recording & Translation permissions -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <package android:name="com.google.android.apps.healthdata" />
+        <provider android:authorities="com.example.salarytracker.voiceprovider" />
+        <!-- Messenger / WhatsApp - send_messenger, send_whatsapp -->
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.whatsapp" />
+        <!-- App launching - YouTube, Telegram, Facebook (Android 11+ queries) -->
+        <package android:name="com.google.android.youtube" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.facebook.katana" />
+    </queries>
+
+    <application
+        android:name=".VoiceBrainApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@drawable/luma_icon"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/luma_icon"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VoiceBrainLive">
+        <activity android:name=".updates.AppUpdateActivity" android:exported="false" />
+        
+        <!-- Disable Startup initializers that may crash (ProfileInstaller, EmojiCompat) -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data android:name="androidx.profileinstaller.ProfileInstallerInitializer" tools:node="remove" />
+            <meta-data android:name="androidx.emoji2.text.EmojiCompatInitializer" tools:node="remove" />
+        </provider>
+        
+        <!-- SplashActivity kept for debugging; not used as launcher -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
+
+        <activity
+            android:name=".OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.VoiceBrainLive">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+        <activity
+            android:name=".ContactsActivity"
+            android:exported="false"
+            android:label="Quick Contacts"
+            android:theme="@style/Theme.VoiceBrainLive" />
+        
+        <activity
+            android:name=".NotesActivity"
+            android:exported="false"
+            android:label="Voice Notes"
+            android:theme="@style/Theme.VoiceBrainLive" />
+        
+        <activity
+            android:name=".VoiceTrainingActivity"
+            android:exported="false"
+            android:label="Voice Training"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Settings"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <!-- Spotify OAuth callback: voicebrainlive://callback -->
+        <activity
+            android:name=".SpotifyAuthCallbackActivity"
+            android:exported="true"
+            android:theme="@style/Theme.VoiceBrainLive">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="voicebrainlive" android:host="callback" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".GuideActivity"
+            android:exported="false"
+            android:label="@string/guide_title"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:label="Voice History"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <activity
+            android:name=".RemindersActivity"
+            android:exported="false"
+            android:label="Reminders"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <activity
+            android:name=".AutomationActivity"
+            android:exported="false"
+            android:label="@string/automation_section_title"
+            android:theme="@style/Theme.VoiceBrainLive" />
+
+        <activity
+            android:name=".routines.AutomationApprovalActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.VoiceBrainLive" />
+            
+        <activity
+            android:name=".MacrosActivity"
+            android:exported="false"
+            android:label="Voice Macros"
+            android:theme="@style/Theme.VoiceBrainLive" />
+        
+        <activity
+            android:name=".ui.MemoryManagerActivity"
+            android:exported="false"
+            android:label="Memory Manager"
+            android:theme="@style/Theme.VoiceBrainLive" />
+        
+        <!-- Assistant Overlay Activity - appears on home screen -->
+        <activity
+            android:name=".AssistantActivity"
+            android:exported="true"
+            android:theme="@style/Theme.VoiceBrainLive.Transparent"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Voice Interaction Service -->
+        <service
+            android:name=".VoiceBrainService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+            <intent-filter android:priority="1000">
+                <action android:name="android.service.voice.VoiceInteractionService" />
+                <action android:name="android.intent.action.ASSIST" />
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+            </intent-filter>
+        </service>
+        
+        <!-- Voice Interaction Session Service -->
+        <service
+            android:name=".VoiceBrainSessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true" />
+
+        <!-- RecognitionService - Required for full VIA validation (Samsung/One UI "None" fix) -->
+        <service
+            android:name=".VoiceBrainRecognitionService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_SPEECH_RECOGNITION">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+
+        <!-- Media Session: reliable Spotify/YT Music play via MediaController (Settings → Notification access) -->
+        <service
+            android:name=".MediaSessionAccessService"
+            android:exported="true"
+            android:label="Voice Brain - Media Control"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Wake Word: Hey Voice / Voice Brain ပြောပြီး နှိုးမယ် -->
+        <service
+            android:name=".WakeWordListenerService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- v2.1: Floating bubble – overlay icon to open Assistant -->
+        <service
+            android:name=".FloatingBubbleService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating bubble to open Voice Brain assistant" />
+        </service>
+
+        <!-- Live Assistant Service: Foreground mic and assistant service for background overlay session -->
+        <service
+            android:name=".VoiceLiveService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Live Voice Assistant and Notification Announcer" />
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <receiver
+            android:name=".ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.voicebrainlive.REMINDER" />
+                <action android:name="com.example.voicebrainlive.REMINDER_DONE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Event-Driven: Meeting မစခင် ၁၅ မိနစ်အလို သတိပေး -->
+        <receiver
+            android:name=".calendar.CalendarEventReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.voicebrainlive.CAL_EVENT_REMINDER" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".calendar.CalendarReminderSpeakerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Calendar event reminder TTS" />
+        </service>
+
+        <!-- Phase 2.1: Geofencing – Home/Office GPS ရောက်တဲ့အခါ trigger -->
+        <receiver
+            android:name=".location.GeofenceReceiver"
+            android:exported="false" />
+
+        <!-- Event-Driven: Office WiFi ရောက်တဲ့အခါ ခုပဲ ရောက်တာလား -->
+        <service
+            android:name=".location.LocationArrivalSpeakerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Office arrival TTS" />
+        </service>
+
+        <!-- Proactive "မိုးရွာမယ်" – မနက် ၇ နာရီမှာ မိုးရွာမယ့် အခြေအနေ သတိပေး -->
+        <receiver
+            android:name=".proactive.ProactiveRainReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.voicebrainlive.PROACTIVE_RAIN" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Phase 4: Proactive Assistant Features -->
+        <receiver
+            android:name=".proactive.ProactiveContextReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BATTERY_LOW" />
+                <action android:name="android.intent.action.HEADSET_PLUG" />
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".proactive.ProactiveRainService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Proactive rain alert check" />
+        </service>
+
+
+
+        <!-- Routines Engine: scheduled daily tasks (weather, reminder) -->
+        <receiver
+            android:name=".routines.RoutineReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.voicebrainlive.ROUTINE" />
+                <action android:name="com.example.voicebrainlive.ROUTINE_PRE" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".routines.RoutineBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".routines.RoutineSpeakerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Routine TTS and notifications" />
+        </service>
+
+        <!-- Phase 3.1: Boot – Wake Word service အလိုအလျောက် ပြန်စတင်ခြင်း (Screen ပိတ်ချိန် မသတ်ပစ်အောင်) -->
+        <receiver
+            android:name=".WakeWordBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Boot: Bubble service အလိုအလျောက် ပြန်စတင်ခြင်း -->
+        <receiver
+            android:name=".BubbleBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- v2.0 Call Recording Service -->
+        <service
+            android:name=".CallRecordingService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
+        
+        <!-- v2.0 Call State Receiver -->
+        <receiver
+            android:name=".CallStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".VoiceBrainWidget"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/voice_brain_widget_info" />
+        </receiver>
+
+        <!-- Unified Notification Listener (SMS, Samsung Health, Weather & Custom Apps) -->
+        <service
+            android:name=".messenger.UnifiedNotificationListenerService"
+            android:exported="true"
+            android:label="Voice Brain - Notification Engine"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Messenger/WhatsApp Notification Reply - RemoteInput ဖြင့် တိုက်ရိုက်ပို့နိုင် -->
+        <service
+            android:name=".messenger.MessengerNotificationReplyService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- v3.0: Accessibility Voice Access Service -->
+        <service
+            android:name=".VoiceBrainAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:label="Voice Brain - Voice Access Service">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+    </application>
+
+</manifest>

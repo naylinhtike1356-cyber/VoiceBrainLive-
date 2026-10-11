@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background gradient circle -->
+    <group>
+        <!-- Outer glow ring -->
+        <path
+            android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"
+            android:strokeWidth="3"
+            android:strokeColor="#4FC3F7"
+            android:strokeAlpha="0.3"
+            android:fillColor="#00000000"/>
+        
+        <!-- Middle glow ring -->
+        <path
+            android:pathData="M54,54m-34,0a34,34 0,1 1,68 0a34,34 0,1 1,-68 0"
+            android:strokeWidth="2"
+            android:strokeColor="#8B5CF6"
+            android:strokeAlpha="0.4"
+            android:fillColor="#00000000"/>
+        
+        <!-- Inner filled circle -->
+        <path
+            android:pathData="M54,54m-26,0a26,26 0,1 1,52 0a26,26 0,1 1,-52 0"
+            android:fillColor="#8B5CF6"/>
+    </group>
+    
+    <!-- Brain icon with wave -->
+    <group
+        android:translateX="38"
+        android:translateY="36">
+        
+        <!-- Left brain half -->
+        <path
+            android:pathData="M16,4C14,4 12,5.5 12,8C12,6 10,4 8,4C5,4 2,7 2,11C2,18 8,24 16,28"
+            android:strokeWidth="2.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"/>
+        
+        <!-- Right brain half -->
+        <path
+            android:pathData="M16,4C18,4 20,5.5 20,8C20,6 22,4 24,4C27,4 30,7 30,11C30,18 24,24 16,28"
+            android:strokeWidth="2.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"/>
+        
+        <!-- Sound wave left -->
+        <path
+            android:pathData="M6,14C4,14 2,12 2,10"
+            android:strokeWidth="2"
+            android:strokeColor="#4FC3F7"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"/>
+        
+        <!-- Sound wave right -->
+        <path
+            android:pathData="M26,14C28,14 30,12 30,10"
+            android:strokeWidth="2"
+            android:strokeColor="#4FC3F7"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"/>
+    </group>
+</vector>

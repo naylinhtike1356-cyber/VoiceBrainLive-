@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.VoiceBrainLive" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/assistant_bg_gradient_end</item>
+        <item name="android:windowBackground">@color/assistant_bg</item>
+        <item name="android:colorBackground">@color/assistant_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="colorPrimary">@color/assistant_primary</item>
+        <item name="colorPrimaryVariant">@color/assistant_primary_light</item>
+        <item name="colorOnPrimary">@color/assistant_text</item>
+        <item name="colorSecondary">@color/assistant_secondary</item>
+        <item name="colorOnSecondary">@color/assistant_text</item>
+        <item name="colorSurface">@color/assistant_surface</item>
+        <item name="colorOnSurface">@color/assistant_text</item>
+    </style>
+    
+    <!-- Truly Transparent Floating Overlay Theme - Does NOT block or hide underlying apps -->
+    <style name="Theme.VoiceBrainLive.Transparent" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowFrame">@null</item>
+        <item name="android:windowElevation">0dp</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+    </style>
+</resources>

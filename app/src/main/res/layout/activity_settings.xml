@@ -1,0 +1,259 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_gradient"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:animateLayoutChanges="true"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="24dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="20dp" android:layout_marginBottom="24dp">
+            <ImageButton android:id="@+id/btnBack" android:layout_width="44dp" android:layout_height="44dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_menu_revert" app:tint="@color/white" android:contentDescription="@string/desc_back" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="16dp" android:text="@string/settings_title" android:textColor="@color/white" android:textSize="22sp" android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardCategoryQuickControls" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_settings_section" android:orientation="vertical" android:animateLayoutChanges="true" android:layout_marginBottom="14dp">
+            <LinearLayout android:id="@+id/headerCategoryQuickControls" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground">
+                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_sparkle" app:tint="@color/assistant_primary_light" android:contentDescription="အမြန် ထိန်းချုပ်မှုများ (Quick Controls)" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="အမြန် ထိန်းချုပ်မှုများ (Quick Controls)" android:textColor="@color/white" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Voice Wake, Floating Bubble, Battery &amp; Assistant" android:textColor="@color/assistant_text_secondary" android:textSize="11sp" android:layout_marginTop="2dp" />
+                </LinearLayout>
+                <ImageView android:id="@+id/arrowCategoryQuickControls" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron_down" app:tint="@color/assistant_text_secondary" android:contentDescription="Toggle category" />
+            </LinearLayout>
+            <View android:id="@+id/dividerCategoryQuickControls" android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:visibility="gone" />
+            <LinearLayout android:id="@+id/bodyCategoryQuickControls" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="16dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="6dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Hey Voice / Voice Brain ပြောပြီး နှိုးမယ်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Switch android:id="@+id/switchWakeWord" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Battery Saver: ဖုန်းကို အိတ်ကပ်ထဲထည့်ထားလျှင် အလိုအလျောက်ပိတ်ပါမည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <LinearLayout android:id="@+id/layoutBubble" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Floating Bubble ဖွင့်ထားမည်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="အခြား App သုံးနေစဉ် Voice Brain ကို ချက်ချင်းခေါ်နိုင်မည့် မျောနေသော အဝိုင်းခလုတ်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <Switch android:id="@+id/switchBubble" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/layoutBubbleTheme" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bubble ဒီဇိုင်း (Avatar Skin)" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ပစ်တိုင်းထောင်၊ ရိုဘော့ သို့မဟုတ် နီယွန် အလင်းလုံး" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <Spinner android:id="@+id/spinnerBubbleTheme" android:layout_width="160dp" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="12dp" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="စနစ်ပိုင်းဆိုင်ရာ ဝင်ရောက်ခွင့် လမ်းကြောင်းများ" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="8dp" />
+                <Button android:id="@+id/btnDefaultAssistant" android:layout_width="match_parent" android:layout_height="44dp" android:background="@drawable/bg_gem" android:text="Default Assistant App (ပါဝါခလုတ် နှိုးရန်)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:layout_marginBottom="8dp" />
+                <Button android:id="@+id/btnBatteryOptimization" android:layout_width="match_parent" android:layout_height="44dp" android:background="@drawable/bg_edit_text" android:text="Battery Saver ကင်းလွတ်ခွင့်ပြုမည်" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="ဆူညံပတ်ဝန်းကျင် သို့မဟုတ် တိုးတိုးပြော မုဒ်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Switch android:id="@+id/switchNoisyEnv" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardCategoryVoice" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_settings_section" android:orientation="vertical" android:animateLayoutChanges="true" android:layout_marginBottom="14dp">
+            <LinearLayout android:id="@+id/headerCategoryVoice" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground">
+                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_mic_settings" app:tint="@color/assistant_primary_light" android:contentDescription="အသံနှင့် ဉာဏ်ရည် သတ်မှတ်ချက်များ (Voice &amp; AI)" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="အသံနှင့် ဉာဏ်ရည် သတ်မှတ်ချက်များ (Voice &amp; AI)" android:textColor="@color/white" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini Voice, Model, Profile, Silence Timeout" android:textColor="@color/assistant_text_secondary" android:textSize="11sp" android:layout_marginTop="2dp" />
+                </LinearLayout>
+                <ImageView android:id="@+id/arrowCategoryVoice" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron_down" app:tint="@color/assistant_text_secondary" android:contentDescription="Toggle category" />
+            </LinearLayout>
+            <View android:id="@+id/dividerCategoryVoice" android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:visibility="gone" />
+            <LinearLayout android:id="@+id/bodyCategoryVoice" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="16dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Assistant Voice" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Spinner android:id="@+id/spinnerVoice" android:layout_width="140dp" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="12dp" />
+                </LinearLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Gemini Live Model" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Spinner android:id="@+id/spinnerGeminiModel" android:layout_width="180dp" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="12dp" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Voice Profile (ကိုယ့်အသံတစ်ခုတည်း နားထောင်ရန်)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="10dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="10dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="သင့်အသံကိုပဲ နားထောင်မယ်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Switch android:id="@+id/switchVoiceProfile" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <Button android:id="@+id/btnVoiceTraining" android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginBottom="6dp" android:background="@drawable/bg_gem" android:text="အသံမှတ်သားပါ (၅ ခါ ပြောပါ)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" />
+                <Button android:id="@+id/btnResetVoiceProfile" android:layout_width="match_parent" android:layout_height="38dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:text="@string/voice_profile_reset_btn" android:textColor="@color/assistant_text_muted" android:textSize="12sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Silence Timeout (အသံမဝင်ရင် ရပ်မယ်)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="6dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="စက္ကန့်အကြာတွင် Mic ပိတ်မည့် ကြာချိန်" android:textColor="@color/assistant_text_secondary" android:textSize="13sp" />
+                    <EditText android:id="@+id/etSilenceTimeout" android:layout_width="60dp" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:hint="3" android:gravity="center" android:inputType="number" android:textColor="@color/white" android:textColorHint="@color/assistant_text_muted" android:textSize="14sp" />
+                    <Spinner android:id="@+id/spinnerSilenceTimeoutUnit" android:layout_width="110dp" android:layout_height="40dp" android:layout_marginStart="8dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="8dp" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AI စကားပြောပြီးနောက် မည်သည့်အသံမျှ မပြောပါက Session အလိုလို ပိတ်ပေးမည့် ကြာချိန်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="အလိုအလျောက်ပိတ်ချိန် (Idle Timeout)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ခိုင်းစေချက်မရှိရင် ဘယ်မိနစ်ကြာရင် အလိုအလျောက်ပိတ်မလဲ" android:textColor="@color/assistant_text_secondary" android:textSize="12sp" android:layout_marginBottom="6dp" />
+                <Spinner android:id="@+id/spinnerIdleTimeout" android:layout_width="match_parent" android:layout_height="44dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="16dp" android:layout_marginBottom="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ပိတ်မထား ရွေးရင် ကိုယ်တိုင် ပိတ်မှ ပိတ်မည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ဖုန်းခေါ်ဆိုမှု စမ်းသပ်မုဒ် (Test Call Mode)" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ဖုန်းခေါ်ဆိုမှုအား တကယ့်ဖုန်းမခေါ်ဘဲ စမ်းသပ်ဖုန်းခေါ်ဆိုမှုဖြင့် စစ်ဆေးမည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <Switch android:id="@+id/switchTestCallMode" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardCategoryApis" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_settings_section" android:orientation="vertical" android:animateLayoutChanges="true" android:layout_marginBottom="14dp">
+            <LinearLayout android:id="@+id/headerCategoryApis" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground">
+                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_key" app:tint="@color/assistant_primary_light" android:contentDescription="APIs" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ချိတ်ဆက်မှုများနှင့် API သော့များ" android:textColor="@color/white" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini, Notion, Messenger, Spotify" android:textColor="@color/assistant_text_secondary" android:textSize="11sp" android:layout_marginTop="2dp" />
+                </LinearLayout>
+                <ImageView android:id="@+id/arrowCategoryApis" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron_down" app:tint="@color/assistant_text_secondary" android:contentDescription="Expand" />
+            </LinearLayout>
+            <View android:id="@+id/dividerCategoryApis" android:layout_width="match_parent" android:layout_height="1dp" android:background="#1AFFFFFF" android:visibility="gone" />
+            <LinearLayout android:id="@+id/bodyCategoryApis" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp" android:visibility="gone">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gemini API Key" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="6dp">
+                    <EditText android:id="@+id/etGeminiApiKey" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:background="@drawable/bg_edit_text" android:hint="Enter Gemini API Key" android:textColorHint="@color/assistant_text_muted" android:textColor="@color/white" android:textSize="14sp" android:paddingHorizontal="16dp" android:inputType="textPassword" android:importantForAutofill="no" />
+                    <ImageButton android:id="@+id/btnToggleGeminiKey" android:layout_width="44dp" android:layout_height="44dp" android:layout_marginStart="8dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_secure" app:tint="@color/assistant_text_secondary" android:contentDescription="@string/desc_toggle_visibility" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Google AI Studio မှ API key ရယူပါ" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#15FFFFFF" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notion Integration" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Integration Token" android:textColor="@color/assistant_text_secondary" android:textSize="12sp" android:layout_marginBottom="6dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="12dp">
+                    <EditText android:id="@+id/etNotionToken" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:background="@drawable/bg_edit_text" android:hint="Enter Notion Integration Token" android:textColorHint="@color/assistant_text_muted" android:textColor="@color/white" android:textSize="14sp" android:paddingHorizontal="16dp" android:inputType="textPassword" android:importantForAutofill="no" />
+                    <ImageButton android:id="@+id/btnToggleNotionToken" android:layout_width="44dp" android:layout_height="44dp" android:layout_marginStart="8dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_secure" app:tint="@color/assistant_text_secondary" android:contentDescription="@string/desc_toggle_visibility" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Database ID" android:textColor="@color/assistant_text_secondary" android:textSize="12sp" android:layout_marginBottom="6dp" />
+                <EditText android:id="@+id/etNotionDatabaseId" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/bg_edit_text" android:hint="Enter Notion Database ID" android:textColorHint="@color/assistant_text_muted" android:textColor="@color/white" android:textSize="14sp" android:paddingHorizontal="16dp" android:inputType="text" android:importantForAutofill="no" android:layout_marginBottom="6dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="notion.so/my-integrations တွင် integration ဖန်တီးနိုင်သည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#15FFFFFF" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Facebook Messenger API" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Page Access Token" android:textColor="@color/assistant_text_secondary" android:textSize="12sp" android:layout_marginBottom="6dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="8dp">
+                    <EditText android:id="@+id/etMessengerToken" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:background="@drawable/bg_edit_text" android:hint="Enter Page Access Token" android:textColorHint="@color/assistant_text_muted" android:textColor="@color/white" android:textSize="13sp" android:paddingHorizontal="12dp" android:inputType="textPassword" android:importantForAutofill="no" />
+                    <ImageButton android:id="@+id/btnClearMessengerToken" android:layout_width="40dp" android:layout_height="40dp" android:layout_marginStart="4dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_menu_close_clear_cancel" app:tint="@color/assistant_text_secondary" android:visibility="gone" android:contentDescription="Clear Token" />
+                    <ImageButton android:id="@+id/btnToggleMessengerKey" android:layout_width="44dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_secure" app:tint="@color/assistant_text_secondary" android:contentDescription="@string/desc_toggle_visibility" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="User Access Token (Optional)" android:textColor="@color/assistant_text_secondary" android:textSize="12sp" android:layout_marginBottom="6dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="10dp">
+                    <EditText android:id="@+id/etMessengerUserToken" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:background="@drawable/bg_edit_text" android:hint="Enter User Access Token" android:textColorHint="@color/assistant_text_muted" android:textColor="@color/white" android:textSize="13sp" android:paddingHorizontal="12dp" android:inputType="textPassword" android:importantForAutofill="no" />
+                    <ImageButton android:id="@+id/btnClearMessengerUserToken" android:layout_width="40dp" android:layout_height="40dp" android:layout_marginStart="4dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_menu_close_clear_cancel" app:tint="@color/assistant_text_secondary" android:visibility="gone" android:contentDescription="Clear User Token" />
+                    <ImageButton android:id="@+id/btnToggleMessengerUserKey" android:layout_width="44dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_secure" app:tint="@color/assistant_text_secondary" android:contentDescription="@string/desc_toggle_visibility" />
+                </LinearLayout>
+                <TextView android:id="@+id/tvPageTokenStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Page Token: Not checked" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="2dp" />
+                <TextView android:id="@+id/tvUserTokenStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="User Token: Not checked" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="10dp" />
+                <Button android:id="@+id/btnTestMessenger" android:layout_width="match_parent" android:layout_height="44dp" android:text="Test Connection" android:background="@drawable/bg_button_primary" android:textAllCaps="false" android:textSize="13sp" android:textColor="@color/white" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#15FFFFFF" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Spotify" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:id="@+id/tvSpotifyStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Login လုပ်ပြီး သီးချင်းအမည်ပြောပြီး ဖွင့်လို့ရမယ်" android:textColor="@color/assistant_text_secondary" android:textSize="13sp" android:layout_marginBottom="10dp" />
+                <Button android:id="@+id/btnSpotifyConnect" android:layout_width="match_parent" android:layout_height="44dp" android:background="@drawable/bg_gem" android:text="Spotify ချိတ်ဆက်မယ်" android:textColor="@color/assistant_primary_light" android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardCategoryMemory" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_settings_section" android:orientation="vertical" android:animateLayoutChanges="true" android:layout_marginBottom="14dp">
+            <LinearLayout android:id="@+id/headerCategoryMemory" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground">
+                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_bell_settings" app:tint="@color/assistant_primary_light" android:contentDescription="လုံခြုံရေး၊ အသိပေးချက်နှင့် မှတ်ဉာဏ် (Privacy &amp; Data)" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="လုံခြုံရေး၊ အသိပေးချက်နှင့် မှတ်ဉာဏ် (Privacy &amp; Data)" android:textColor="@color/white" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Access, App Filter, Memory Manager" android:textColor="@color/assistant_text_secondary" android:textSize="11sp" android:layout_marginTop="2dp" />
+                </LinearLayout>
+                <ImageView android:id="@+id/arrowCategoryMemory" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron_down" app:tint="@color/assistant_text_secondary" android:contentDescription="Toggle category" />
+            </LinearLayout>
+            <View android:id="@+id/dividerCategoryMemory" android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:visibility="gone" />
+            <LinearLayout android:id="@+id/bodyCategoryMemory" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="16dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="12dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification Access ခွင့်ပြုချက်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                        <TextView android:id="@+id/tvNotificationAccessStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⬤ Not granted" android:textColor="#FF4444" android:textSize="11sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <Button android:id="@+id/btnGrantNotificationAccess" android:layout_width="wrap_content" android:layout_height="36dp" android:text="ဖွင့်ပေးမယ်" android:background="@drawable/bg_button_primary" android:textAllCaps="false" android:textSize="12sp" android:textColor="@color/white" android:paddingHorizontal="14dp" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📱 စိတ်ကြိုက် App များ၏ Notification များကို AI ထဖတ်ပြစနစ်" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:id="@+id/tvSelectedNotificationAppsSummary" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ရွေးချယ်ထားသော App များ: Weather, Messenger, WhatsApp, Messages" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="10dp" />
+                <Button android:id="@+id/btnSelectNotificationApps" android:layout_width="match_parent" android:layout_height="44dp" android:background="@drawable/bg_gem" android:text="AI အား ဖတ်ခိုင်းမည့် App များ ရွေးချယ်မည် (Select Apps)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:layout_marginBottom="14dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⏱️ အသံပြန်မပြောပါက အလိုအလျောက်ပိတ်ချိန်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notification ဖတ်ပြပြီးနောက် မည်သည့်အသံမျှ မပြောပါက အလိုလို ပိတ်ပေးမည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <Spinner android:id="@+id/spinnerNotificationAutoTimeout" android:layout_width="120dp" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="8dp" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🧠 ပါတနာ မှတ်ဉာဏ်စနစ် (Assistant Memory Core)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="သင်ယူထားသော အချက်အလက်များ (Facts)၊ စကားပြောမှတ်တမ်းများ (AI Embeddings) နှင့် အလေ့အထများ (Habits) ကို စီမံခန့်ခွဲနိုင်ပါသည်" android:textColor="@color/assistant_text_muted" android:textSize="12sp" android:lineSpacingExtra="2dp" android:layout_marginBottom="14dp" />
+                <Button android:id="@+id/btnManageMemory" android:layout_width="match_parent" android:layout_height="46dp" android:background="@drawable/bg_gem" android:text="🧠 မှတ်ဉာဏ်များ ကြည့်ရှု/စီမံမည် (Manage Memories)" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="10dp" />
+                <Button android:id="@+id/btnClearMemory" android:layout_width="match_parent" android:layout_height="44dp" android:background="@drawable/bg_button_primary" android:text="🗑️ မှတ်ဉာဏ်ဟောင်းများ အားလုံး ဖျက်မည် (Reset Memory)" android:textColor="@color/white" android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardCategoryAdvanced" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_settings_section" android:orientation="vertical" android:animateLayoutChanges="true" android:layout_marginBottom="14dp">
+            <LinearLayout android:id="@+id/headerCategoryAdvanced" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="16dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground">
+                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_wrench_settings" app:tint="@color/assistant_primary_light" android:contentDescription="အဆင့်မြင့်နှင့် စနစ် ဆက်တင်များ (Advanced &amp; System)" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="အဆင့်မြင့်နှင့် စနစ် ဆက်တင်များ (Advanced &amp; System)" android:textColor="@color/white" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Theme, Health, Timezone, Reminders, Diagnostics" android:textColor="@color/assistant_text_secondary" android:textSize="11sp" android:layout_marginTop="2dp" />
+                </LinearLayout>
+                <ImageView android:id="@+id/arrowCategoryAdvanced" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_chevron_down" app:tint="@color/assistant_text_secondary" android:contentDescription="Toggle category" />
+            </LinearLayout>
+            <View android:id="@+id/dividerCategoryAdvanced" android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:visibility="gone" />
+            <LinearLayout android:id="@+id/bodyCategoryAdvanced" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="16dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Appearance Theme" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Spinner android:id="@+id/spinnerTheme" android:layout_width="120dp" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="12dp" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⌚ Samsung Health &amp; Smartwatch Assistant" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="အိပ်ချိန်၊ ခြေလှမ်းနှင့် လေ့ကျင့်ခန်း အချက်အလက်များကို AI မှ အလိုအလျောက် သတိပေးအစီရင်ခံမည့်စနစ်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="12dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="10dp">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="❤️ Samsung Health Assistant ဖွင့်မည်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Switch android:id="@+id/switchHealthAssistant" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" />
+                </LinearLayout>
+                <Button android:id="@+id/btnHealthConnectSettings" android:layout_width="match_parent" android:layout_height="40dp" android:layout_marginBottom="10dp" android:background="@drawable/bg_edit_text" android:text="Samsung Health / Health Connect ချိတ်ဆက်ရန်" android:textColor="@color/assistant_primary_light" android:textSize="12sp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⏰ နေ့စဉ် ကျန်းမာရေး အစီရင်ခံမည့် အချိန်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="သတ်မှတ်ထားသော အချိန်တွင် AI မှ ကျန်းမာရေး အစီရင်ခံစာကို အလိုအလျောက် ပြောပြမည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <Button android:id="@+id/btnSetHealthRoutineTime" android:layout_width="wrap_content" android:layout_height="40dp" android:background="@drawable/bg_edit_text" android:text="08:00 AM" android:textColor="@color/assistant_primary_light" android:textSize="13sp" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="နိုင်ငံ၊ စံတော်ချိန် နှင့် သတိပေးမှု အကြိမ်ရေ" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="10dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="နိုင်ငံ / စံတော်ချိန်" android:textColor="@color/assistant_text_secondary" android:textSize="13sp" android:layout_marginBottom="6dp" />
+                <Spinner android:id="@+id/spinnerTimezone" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="16dp" android:layout_marginBottom="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="သတိပေးချက် နေ့ရက်/အချိန် သတ်မှတ်ရာမှာ ဒီနိုင်ငံအချိန်ကို အတည်ယူပါမယ်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:layout_marginBottom="12dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="သတိပေးချက် ပြန်သတိပေးချိန်" android:textColor="@color/assistant_text_secondary" android:textSize="13sp" android:layout_marginBottom="6dp" />
+                <Spinner android:id="@+id/spinnerReminderRepeat" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/bg_edit_text" android:paddingHorizontal="16dp" android:layout_marginBottom="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="မပိတ်မချင်း ရွေးထားတဲ့ မိနစ်တခါ ပြန်သတိပေးမည်" android:textColor="@color/assistant_text_muted" android:textSize="11sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Diagnostics &amp; Logs" android:textColor="@color/assistant_primary_light" android:textSize="13sp" android:fontFamily="sans-serif-medium" android:layout_marginBottom="6dp" />
+                <TextView android:id="@+id/tvLogPath" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Log file location will appear here" android:textColor="@color/assistant_text_muted" android:textSize="11sp" android:lineSpacingExtra="2dp" android:layout_marginBottom="14dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/settings_divider" android:layout_marginTop="14dp" android:layout_marginBottom="14dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="အမှားအသေးစိတ် Toast မှာ ပြမယ်" android:textColor="@color/assistant_text_secondary" android:textSize="14sp" />
+                    <Switch android:id="@+id/switchShowErrorDetails" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <Button android:id="@+id/btnSave" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="8dp" android:layout_marginBottom="14dp" android:background="@drawable/bg_button_primary" android:text="Save Settings" android:textColor="@color/white" android:textSize="16sp" android:fontFamily="sans-serif-medium" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="🔒 Your API keys are stored securely on your device" android:textColor="@color/assistant_text_muted" android:textSize="12sp" android:layout_marginBottom="24dp" />
+        <Button
+            android:id="@+id/btnAppUpdates"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="24dp"
+            android:drawableStart="@android:drawable/ic_popup_sync"
+            android:text="App updates"
+            android:textAllCaps="false" />
+    </LinearLayout>
+</ScrollView>

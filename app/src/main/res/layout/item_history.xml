@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:layout_marginBottom="16dp">
+
+    <!-- USER bubble (right-aligned, rounded gray bubble like Gemini app) -->
+    <LinearLayout
+        android:id="@+id/layoutUserBubble"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_chat_user"
+            android:paddingHorizontal="20dp"
+            android:paddingVertical="12dp"
+            android:layout_marginStart="56dp">
+
+            <TextView
+                android:id="@+id/tvHistoryUser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="280dp"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ASSISTANT message (left-aligned, flat text with Sparkle icon like Gemini app) -->
+    <LinearLayout
+        android:id="@+id/layoutAssistantBubble"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone">
+
+        <!-- Sparkle Icon (Using TextView emoji for now, can be replaced by real drawable later) -->
+        <TextView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:text="✦"
+            android:textColor="#669DF6"
+            android:gravity="center"
+            android:textSize="20sp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginTop="2dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginEnd="8dp"
+            android:layout_marginTop="2dp">
+
+            <TextView
+                android:id="@+id/tvHistoryAssistant"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/assistant_text"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:lineSpacingMultiplier="1.3"
+                android:lineSpacingExtra="4dp" />
+
+            <!-- Actions Row (Like, Dislike, Refresh, Copy etc.) -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+
+                <!-- Placeholder for icons to match Gemini look -->
+                <ImageButton
+                    android:id="@+id/btnLikeHistory"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_edit"
+                    app:tint="@color/assistant_text_muted"
+                    android:visibility="gone" />
+
+                 <ImageButton
+                    android:id="@+id/btnShareHistory"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_share"
+                    app:tint="@color/assistant_text_muted"
+                    android:contentDescription="@string/desc_share"
+                    android:layout_marginEnd="12dp"
+                     />
+                     
+                <!-- Adding simple text for time -->
+                <TextView
+                     android:id="@+id/tvHistoryDate"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:textColor="@color/assistant_text_muted"
+                     android:textSize="12sp"
+                     android:layout_gravity="center_vertical"
+                     android:layout_marginStart="8dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,222 @@
+<resources>
+    <string name="app_name">Luma</string>
+    <string name="greeting">Hi! How can I help you today?</string>
+    <string name="tap_to_start">နှိပ်ပြီး စတင်ပါ</string>
+    <string name="listening">နားထောင်နေပါတယ်…</string>
+    <string name="speaking">ပြောနေပါတယ်…</string>
+    <string name="tap_to_stop">နှိပ်ပြီး ရပ်ပါ</string>
+    <string name="connecting">ချိတ်ဆက်နေပါတယ်…</string>
+    <string name="preparing">Preparing…</string>
+    <string name="waiting_for_setup">Waiting for setup…</string>
+    <string name="processing">စဉ်းစားနေပါတယ်…</string>
+
+    <!-- Reconnection (v1.4) -->
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="reconnecting_in_seconds">Reconnecting in %1$d s… (%2$d/%3$d)</string>
+    <string name="reconnecting_status">ပြန်ချိတ်နေပါတယ်…</string>
+    <string name="reconnecting_status_format">ပြန်ချိတ်နေပါတယ်… %1$d စက္ကန့်ကြာမယ် (%2$d/%3$d)</string>
+    <string name="offline_connect_internet">အင်တာနက် ချိတ်ဆက်ပါ</string>
+    <string name="offline_local_only">Offline - local commands only</string>
+    <string name="no_internet_voice">No internet - connect for voice commands</string>
+
+    <!-- Permissions & API -->
+    <string name="mic_permission_required">Microphone permission required</string>
+    <string name="contacts_permission_required">Contacts permission required to pick</string>
+    <string name="call_permission_required">Call permission required to place calls</string>
+    <string name="invalid_phone_number">Invalid phone number</string>
+    <string name="please_add_api_key">Settings မှာ Gemini API Key ထည့်ပါ။</string>
+    <string name="local_mode_api_key_missing">Local command mode: Gemini API Key မရှိသေးပါ။</string>
+    <string name="please_wait">ကျေးဇူးပြု၍ စက္ကန့်အနည်းငယ် စောင့်ပါ</string>
+    <string name="copied">Copied</string>
+    <string name="translate">Translate</string>
+    <string name="error">အမှား ဖြစ်သွားပါပြီ</string>
+    <string name="voice_not_recognized">ငါ မင်းကို မှတ်မိဘူး။ အသံမှတ်သားပါ</string>
+    <string name="voice_profile_reset">အသံမှတ်တမ်း ပြန်စပြီးပါပြီ။ ခလုတ်နှိပ်ပြီး ပြန်ပြောပါ</string>
+    <string name="voice_profile_reset_btn">အသံမှတ်တမ်း ပြန်စပါ</string>
+    <string name="voice_sample_too_quiet">အသံမကြားရပါ။ ခလုတ်နှိပ်ပြီး ကျယ်ကျယ်ပြောပါ</string>
+
+    <!-- Bixby-style text input -->
+    <string name="type_to_voice_brain">အသံ သို့မဟုတ် စာနဲ့ ခိုင်းစေပါ</string>
+    <string name="type_hint">လစာပြပေး, ရာသီဥတု, သီချင်းဖွင့်…</string>
+    <string name="text_cmd_connect_first">မိတ်ဆက်ခလုတ် နှိပ်ပြီး ချိတ်ပါ</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Luma မှ ကြိုဆိုပါသည်</string>
+    <string name="onboarding_welcome_subtitle">လွယ်ကူသော အဆင့် ၃ ဆင့်ဖြင့် စတင်အသုံးပြုပါ</string>
+    <string name="onboarding_step1_title">Gemini API Key</string>
+    <string name="onboarding_step1_desc">အသုံးပြုနိုင်ရန် ဆက်တင်များတွင် Gemini API Key ထည့်သွင်းပေးရပါမည်။ Google AI Studio မှ အခမဲ့ ရယူနိုင်ပါသည်။</string>
+    <string name="onboarding_step2_title">မိုက်ကရိုဖုန်း ခွင့်ပြုချက်</string>
+    <string name="onboarding_step2_desc">အသံဖြင့် ခိုင်းစေနိုင်ရန် မိုက်ကရိုဖုန်း အသုံးပြုခွင့်ကို ခွင့်ပြုပေးပါ။</string>
+    <string name="onboarding_step3_title">ပါဝါခလုတ်ဖြင့် နှိုးခြင်း</string>
+    <string name="onboarding_step3_desc">Luma ကို Default Assistant အဖြစ် သတ်မှတ်ပါ: Settings → Apps → Default apps → Digital assistant app. ပြီးလျှင် ပါဝါခလုတ်ကို ဖိနှိပ်ပြီး အချိန်မရွေး နှိုးနိုင်ပါသည်။</string>
+    <string name="onboarding_open_settings">ဆက်တင်များ ဖွင့်ရန်</string>
+    <string name="onboarding_allow_mic">မိုက်ကရိုဖုန်း ခွင့်ပြုရန်</string>
+    <string name="onboarding_next">ရှေ့သို့</string>
+    <string name="onboarding_skip">ကျော်ရန်</string>
+    <string name="onboarding_get_started">စတင်ရန်</string>
+
+    <!-- Localized Error Messages -->
+    <string name="error_api_key_required">API Key လိုအပ်ပါတယ်။ Settings မှာ Gemini API Key ထည့်ပါ။</string>
+    <string name="error_spotify_terminated">Spotify ချိတ်ဆက်မှု ပြတ်သွားပါပြီ။ Spotify App ကို ဖွင့်ထားပါ။</string>
+    <string name="error_spotify_unauthorized">Spotify အသုံးပြုခွင့် မရှိသေးပါ။ Settings မှာ ချိတ်ဆက်ပေးပါ။</string>
+    <string name="error_spotify_remote">Spotify App မှာ ပြဿနာရှိနေပါတယ်။ Spotify ကို ပိတ်ပြီး ပြန်ဖွင့်ကြည့်ပါ။</string>
+    <string name="error_mic_failed">အသံဖမ်းယူမှု အဆင်မပြေပါ။ ခဏနေရင်မှ ပြန်ကြိုးစားပါ။</string>
+    <string name="error_mic_in_use">မိုက်ကရိုဖုန်းကို အခြား App က သုံးနေပါတယ်။</string>
+    <string name="error_api_key_invalid">API Key မမှန်ပါ။ Settings မှာ ပြန်ထည့်ပါ။</string>
+    <string name="error_notion_db_not_found">Notion database မတွေ့ပါ။ Database ကို integration နဲ့ share ပါ။</string>
+    <string name="error_notion_invalid_token">Notion token မမှန်ပါ။ Settings မှာ integration token ပြန်ထည့်ပါ။</string>
+    <string name="error_validation">အချက်အလက် မမှန်ပါ။ ပြန်စစ်ပါ။</string>
+    <string name="error_cannot_connect_server">ဆာဗာနှင့် ချိတ်ဆက်၍မရပါ။ အင်တာနက်ကို စစ်ဆေးပါ။</string>
+    <string name="error_connection_aborted">အင်တာနက်ချိတ်ဆက်မှု ပြတ်တောက်သွားပါသည်။</string>
+    <string name="error_api_forbidden">API Key ခွင့်ပြုချက်မရှိပါ။ Settings တွင် API Key ပြန်စစ်ပါ။</string>
+    <string name="error_server_temporary_unavailable">ဆာဗာ ယာယီအလုပ်မလုပ်ပါ။ ခဏစောင့်ပြီး ပြန်ကြိုးစားပါ။</string>
+    <string name="error_no_internet">အင်တာနက် ချိတ်ဆက်ပါ။</string>
+    <string name="error_timeout">အချိန်ကျော်သွားပါပြီ။ ပြန်ကြိုးစားပါ။</string>
+    <string name="error_connection_closed">ချိတ်ဆက်မှု ပိတ်သွားပါပြီ။</string>
+    <string name="error_connection_lost">ချိတ်ဆက်မှု ပြတ်သွားပါပြီ။ ပြန်ကြိုးစားပါ။</string>
+    <string name="error_rate_limited">အသုံးပြုမှု များသွားပါပြီ။ ခဏစောင့်ပြီး ပြန်ကြိုးစားပါ။</string>
+    <string name="error_gemini_server">Gemini ဆာဗာမှာ ပြဿနာရှိပါသည်။ ခဏလောက် စောင့်ပြီး ပြန်ကြိုးစားပါ။</string>
+    <string name="error_fallback">အမှား ဖြစ်သွားပါပြီ။ ပြန်ကြိုးစားပါ။</string>
+    <string name="error_fallback_short">အမှား ဖြစ်သွားပါပြီ။</string>
+    <string name="error_source_not_found">ရင်းမြစ် မတွေ့ပါ။</string>
+
+    <!-- Samsung MARs / Battery Optimization - prevents silent kill -->
+    <string name="battery_prompt_samsung">Samsung ဖုန်းလား? App ပိတ်မသွားအောင် Settings → Apps → Luma → Battery → Unrestricted ရွေးပါ</string>
+    <string name="battery_prompt_allow">Battery optimization ပိတ်ဖို့ Allow ရွေးပါ</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_gemini_api">Gemini API</string>
+    <string name="settings_api_key_hint">Enter Gemini API Key</string>
+    <string name="settings_notion">Notion</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+
+    <!-- Content descriptions (မြန်မာ for TalkBack) -->
+    <string name="desc_back">နောက်ပြန်</string>
+    <string name="desc_toggle_visibility">ြသမှု ဖွင့်/ပိတ်</string>
+    <string name="desc_edit">ပြင်ဆင်ရန်</string>
+    <string name="desc_call">ခေါ်ဆိုရန်</string>
+    <string name="desc_delete">ဖျက်ရန်</string>
+    <string name="desc_clear_all">အကုန်ဖျက်ရန်</string>
+    <string name="desc_sort_order">အစဉ်လိုက်</string>
+    <string name="desc_history">မှတ်တမ်း</string>
+    <string name="desc_voice_notes">အသံမှတ်စု</string>
+    <string name="desc_quick_contacts">အမြန်ဆက်သွယ်မှု</string>
+    <string name="desc_settings">ဆက်တင်များ</string>
+    <string name="desc_guide">အသုံးပြုလမ်းညွန်</string>
+    <string name="desc_copy">ကူးယူရန်</string>
+    <string name="desc_translate">ဘာသာပြန်ရန်</string>
+    <string name="desc_voice">အသံ</string>
+    <string name="desc_close">ပိတ်ရန်</string>
+    <string name="desc_share">မျှဝေရန်</string>
+    <string name="desc_clear">ဖျက်ရန်</string>
+    <string name="desc_clear_chat">အနေရစာအင်္ဂါးဖျက်ရန်</string>
+    <string name="desc_send">ပို့ရန်</string>
+    
+    <!-- Accessibility descriptions for Chat Fragment -->
+    <string name="desc_chat_messages">စာတိုများ စာရင်း၊ TalkBack ဖြင့် တ်နိုင်သည်</string>
+    <string name="desc_message_input">သင်္ကေတရိုက်ထည့်ရန် နေရာ</string>
+    <string name="accessibility_desc">စခရင်ပေါ်ရှိ အရာများကို အသံဖြင့် ထိန်းချုပ်ရန် Luma Accessibility Service</string>
+
+    <!-- v1.5 Widget & Backup -->
+    <string name="widget_label">Luma</string>
+    <string name="widget_tap_to_open">Tap to open assistant</string>
+    <string name="export_notes">Export notes</string>
+    <string name="import_notes">Import notes</string>
+    <string name="export_contacts">Export contacts</string>
+    <string name="import_contacts">Import contacts</string>
+    <string name="phone_tap_to_pick">နှိပ်ပြီး Contacts မှ ရွေးပါ</string>
+    <string name="export_success">Exported successfully</string>
+    <string name="import_success">Imported successfully</string>
+    <string name="import_error">Import failed</string>
+    <string name="clear_all_notes_confirm">Clear all notes?</string>
+    <string name="reminder_done">ပြီးပြီ / Done</string>
+
+    <!-- v1.6 History search -->
+    <string name="history_search_hint">ရှာပါ… (transcript)</string>
+    <string name="voice_history_title">အသံမှတ်တမ်း</string>
+
+    <!-- Daily automation / routines -->
+    <string name="automation_section_title">🧠 AI Agent (Proactive)</string>
+    <string name="nav_automation">AI Agent</string>
+    <string name="automation_empty">AI Agent က မင်းအတွက် လုပ်ပေးရမယ့် အရာတွေ မရှိသေးပါ\n\n\"မနက် ၇ နာရီ ရာသီဥတု ပြောပြပေး\" လိုမျိုး အချိန်နဲ့ ခိုင်းစေထားနိုင်ပါတယ်</string>
+    <string name="automation_type_weather">ရာသီဥတု ပြောပြမယ်</string>
+    <string name="automation_type_reminder">သတိပေး</string>
+    <string name="automation_type_music">သီချင်းဖွင့်မယ်</string>
+    <string name="automation_add">Agent ကို တာဝန်ပေးရန်</string>
+    <string name="automation_created">ထည့်ပြီးပါပြီ</string>
+    <string name="automation_edit_type">အမျိုးအစား</string>
+    <string name="automation_edit_time">အချိန်</string>
+    <string name="automation_edit_message">သတိပေးစာ (သတိပေးမျိုးအတွက်)</string>
+    <string name="automation_edit_message_hint">ဥပမာ: ပန်ကန်ထိုးတီး</string>
+    <string name="automation_edit_music">သီချင်း အမျိုးအစား/Genre/Mood</string>
+    <string name="automation_edit_music_hint">ဥပမာ: jazz, Lo-fi, ကော်ပီ, Gym</string>
+    <string name="automation_edit_reminder_before">ကြိုသတိပေး (Optional)</string>
+    <string name="automation_edit_reminder_minutes_hint">မိနစ်</string>
+    <string name="automation_edit_reminder_text_hint">ဥပမာ: ၅ မိနစ်ကြာတော့မယ်</string>
+    <string name="automation_edit_repeat">ထပ်ခါတလဲလဲ (အခါပြန်)</string>
+    <string name="automation_delete_confirm">ဒီ Agent တာဝန်ကို ဖျက်မလား?</string>
+    <string name="automation_deleted">ဖျက်ပြီးပါပြီ</string>
+    <string name="automation_updated">ပြင်ဆင်ပြီးပါပြီ</string>
+    <string name="exact_alarm_permission_hint">အချိန်တိကျ စီစဉ်ခွင့် ပေးပါ — Settings → Alarms &amp; reminders → Allow</string>
+
+    <!-- v2.0 Jarvis -->
+    <string name="repeat_nothing">ပြန်ပြောစရာ မရှိသေးပါ / Nothing to repeat yet</string>
+    <string name="desc_repeat">ပြန်ပြောပါ</string>
+    <string name="quick_call">ခေါ်မယ်</string>
+    <string name="quick_note">မှတ်မယ်</string>
+    <string name="quick_reminder">သတိပေး</string>
+    <string name="voice_changer">Voice</string>
+    <string name="image_gen">Image</string>
+    <string name="meeting">Meeting</string>
+    
+    <!-- v2.0 UI -->
+    <string name="quick_actions_title">Quick Actions</string>
+    <string name="gems_title">Gems / Assistants</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_gems">Gems</string>
+    <string name="nav_history">History</string>
+
+    <!-- v2.1 -->
+    <string name="bubble_overlay_hint">Enable "Display over other apps" for Luma, then turn on the switch again.</string>
+    <string name="biometric_api_key_title">Verify identity</string>
+    <string name="biometric_api_key_subtitle">Use fingerprint or PIN to view API key</string>
+
+    <!-- v2.2 Offline -->
+    <string name="offline_listening">Offline listening…</string>
+    <string name="offline_stt_unavailable">Speech recognition not available</string>
+    <string name="offline_speak_again">Try again or connect internet</string>
+    <string name="offline_no_match">No offline command for: %1$s</string>
+    <string name="offline_no_match_hint">Try: ဖုန်းခေါ်, မီးအိမ်, ကင်မရာ</string>
+    
+    <!-- v2.3 Offline AI -->
+    <string name="offline_ai_processing">Offline AI processing…</string>
+    <string name="offline_ai_ready">Offline AI ready</string>
+    <string name="offline_ai_not_supported">Connect to internet for better AI</string>
+
+    <!-- Guide / Help -->
+    <string name="guide_title">အသုံးပြုလမ်းညွန်</string>
+    
+    <string name="guide_how_to_use_title">၁. စတင်အသုံးပြုနည်း</string>
+    <string name="guide_how_to_use">🎤 Mic ခလုတ်ကြီးကို နှိပ်ပြီး အသံနဲ့ ပြောပါ\n\n⚙️ ပထမဆုံးအကြိမ် Setup:\n   1. Settings (⚙️) ကို နှိပ်ပါ\n   2. Gemini API Key ထည့်ပါ\n   3. Google AI Studio မှာ API key အခမဲ့ ရယူနိုင်ပါတယ်\n\n📱 Power Button Assistant:\n   Settings → Apps → Default apps → Digital assistant app → Luma ရွေးပါ\n   ပြီးရင် Power button နှိပ်တာနဲ့ Assistant ပွင့်လာမယ်</string>
+    
+    <string name="guide_buttons_title">၂. ခလုတ်များ အသုံးပြုနည်း</string>
+    <string name="guide_buttons">━━━ အပေါ်ဘား (Top Bar) ━━━\n📝 Notes — အသံမှတ်စုများ သိမ်းရန်/ကြည့်ရန်\n👥 Contacts — ဖုန်းနံပါတ်များ သိမ်းထားပြီး အမြန်ခေါ်ရန်\nℹ️ Info — ဒီလမ်းညွန် ဖွင့်ရန်\n⚙️ Settings — API key၊ AI အသံ၊ Theme ပြောင်းရန်\n\n━━━ စာသားကတ် (Transcript Card) ━━━\n▶️ Play — AI ပြန်ပြောပေးတာကို နားထောင်ရန်\n📋 Copy — စာသားကို Clipboard သို့ ကူးရန်\n🌐 Translate — Google Translate မှာ ဖွင့်ရန်\n\n━━━ အောက်ဘား (Bottom Nav) ━━━\n🏠 Home — ပင်မစာမျက်နှာ\n🧠 AI Agent — အော်တိုမေးရှင်းและ သတိပေးချက်များ စီမံရန်\n📜 History — ပြောခဲ့တဲ့ မှတ်တမ်းများ\n\n━━━ Gems (AI Personalities) ━━━\n🤖 Assistant, 📚 Teacher, 🇰🇷 Korean, 🌍 Translator, 💪 Coach, 🇲🇲 Myanmar</string>
+    
+    <string name="guide_voice_commands_title">၃. အသံ Commands များ</string>
+    <string name="guide_voice_commands">━━━ အခြေခံ ━━━\n📞 ဖုန်းခေါ်: \"မောင်မောင်ကို ခေါ်ပေး\" / \"call John\"\n💬 SMS: \"မမကို စာပို့ – မနက်ဖြန် လာပါ\"\n📝 မှတ်စု: \"မှတ်ပေး – ဈေးသွားရမယ်\"\n⏰ သတိပေး: \"၃၀ မိနစ်ကြာရင် သတိပေး\"\n🌤️ ရာသီဥတု: \"ရာသီဥတု\" / \"weather\"\n🎵 သီချင်း: \"သီချင်းဖွင့်\" / \"Taylor Swift ဖွင့်\"\n\n━━━ သီးချင်းဖွင့်ခြင်း (Spotify) ━━━\n1️⃣ Settings → Spotify ချိတ်ဆက်မယ် → Browser မှာ login လုပ်ပါ\n2️⃣ သီးချင်းအမည် သို့မဟုတ် အနုပညာရှင်အမည် ပြောပြီး ခိုင်းပါ\n   ဥပမာ: \"Taylor Swift ဖွင့်\", \"Shape of You ဖွင့်\", \"သီချင်းဖွင့်\"\n3️⃣ Notification access ဖွင့်ထားရင် သီးချင်း auto-play ပိုတည်ငြိမ်မည် (Settings → သီးချင်းဖွင့်ခြင်း)\n\n━━━ ဘာသာပြန် ━━━\n🌐 ပြန်: \"translate hello to korean\"\n🔍 ရှာ: \"ဘယ်ဘာသာလဲ – 안녕하세요\"\n📞 Live: \"live translate myanmar to english\"\n🎙️ Record: \"start call recording\"\n\n━━━ Gems ━━━\n💎 ပြောင်း: \"switch to teacher gem\"\n📋 စာရင်း: \"list gems\" / \"show gems\"\n❓ လက်ရှိ: \"current gem\"\n\n━━━ Calendar ━━━\n📅 ဒီနေ့: \"what\'s my schedule today?\"\n📅 မနက်ဖြန်: \"schedule tomorrow\"\n➕ ထည့်: \"add meeting at 3pm\"\n📆 ဖွင့်: \"open calendar\"\n\n━━━ Email ━━━\n📧 Gmail: \"open Gmail\"\n✉️ ပို့: \"send email to john@gmail.com\"\n🔍 ရှာ: \"search email invoice\"\n\n━━━ Meeting Notes ━━━\n▶️ စတင်: \"start meeting Project Review\"\n📝 ထည့်: \"add note discuss budget\"\n⏹️ ပြီး: \"end meeting\"\n📋 ပြ: \"show meeting notes\"\n\n━━━ လစာမှတ်တမ်း (တိုပြောပါ) ━━━\n📊 လစာပြပေး / ဒီလလစာ\n📅 ယနေ့ရှိလား\n📆 မနေ့ကရော\n⏱️ အချိန်ပို\n➕ ယနေ့ထည့်ပေး\n📋 မနေ့ကလို\n💡 SalaryTracker အက်ပ် လိုပါတယ်\n\n━━━ Voice Changer ━━━\n🎭 ဖွင့်: \"voice changer on chipmunk\"\n🔇 ပိတ်: \"voice changer off\"\n🎤 Effects: chipmunk, deep, robot, echo, alien, demon, child\n\n━━━ AI Image Generation ━━━\n🎨 ဆွဲ: \"generate image of a sunset\"\n🖼️ ဖွင့်: \"open image generator\"\n🐱 နမူနာ: \"draw a cat playing piano\"\n\n━━━ Smart Home ━━━\n📶 WiFi: \"WiFi ဖွင့်\" / \"WiFi ပိတ်\"\n📱 Bluetooth: \"Bluetooth ဖွင့်/ပိတ်\"\n💡 မီးအိမ်: \"flashlight ဖွင့်/ပိတ်\"\n📷 ကင်မရာ: \"camera ဖွင့်\"\n🔊 အသံ: \"volume up\" / \"volume down\"</string>
+    
+    <string name="guide_smart_search_title">၄. Smart Search</string>
+    <string name="guide_smart_search">🤖 AI တိုက်ရိုက်ဖြေ:\n   \"မိုးရွာမလား?\" → AI က ဖြေမယ်\n   \"Python ဆိုတာ ဘာလဲ?\" → AI က ရှင်းပြမယ်\n\n🔍 Google ရှာ:\n   \"ယနေ့သတင်း\" → ကိုရီးယားသတင်း ဦးစားပေး\n   \"ရာသီဥတု\" → ဒီနေရာ (GPS) ဦးစားပေး\n   \"Google မှာ ရှာပေး [query]\"\n\n🛒 Shopping:\n   \"Coupang မှာ ရှာပေး [ပစ္စည်း]\" (ကိုးရီးယား)\n   \"AliExpress မှာ ရှာပေး [product]\" (အင်္ဂလိပ်)</string>
+    
+    <string name="guide_offline_title">၅. Offline Mode (အင်တာနက်မရှိလည်း သုံးလို့ရ)</string>
+    <string name="guide_offline">🔇 အင်တာနက် မရှိရင်လည်း အောက်ပါတွေ သုံးလို့ရပါတယ်:\n\n━━━ Offline Commands ━━━\n📞 ဖုန်းခေါ် / call\n💡 မီးအိမ် ဖွင့်/ပိတ်\n📷 ကင်မရာ ဖွင့်\n🔊 အသံတိုး/လျော့\n📶 WiFi ဖွင့်/ပိတ်\n📱 Bluetooth ဖွင့်/ပိတ်\n⚙️ Settings ဖွင့်\n🎵 Music / YouTube ဖွင့်\n📸 Gallery / Photos ဖွင့်\n📧 Gmail ဖွင့်\n🌐 Browser ဖွင့်\n📱 Apps: Facebook, Instagram, TikTok, Telegram, WhatsApp\n\n━━━ Offline AI ━━━\n🤖 အခြေခံ AI ဖြေဆိုမှုများ:\n• \"အခု ဘယ်နှစ်နာရီလဲ?\" — အချိန်ပြောပြမယ်\n• \"ဒီနေ့ ဘယ်နေ့လဲ?\" — ရက်စွဲပြောပြမယ်\n• \"5 + 3 ဘယ်လောက်လဲ?\" — ဂဏန်းတွက်ပေးမယ်\n• \"အကူအညီ\" — သုံးလို့ရတဲ့ commands ပြမယ်\n\n💡 Tip: အင်တာနက် ရှိရင် AI ပိုစမတ်ဖြစ်ပါတယ်!</string>
+    
+    <string name="guide_features_title">၆. လုပ်ဆောင်ချက်များ စာရင်း နှင့် အသုံးပြုနည်း</string>
+    <string name="guide_features">━━━ ၆.၁ အသံဖြင့် ဖွင့်နည်း ━━━\n• Mic ခလုတ် နှိပ်ပြီး ပြောပါ\n• Power Button ကြာနှိပ်ခြင်း (Settings → Default assistant → Luma)\n• Floating Bubble နှိပ်ခြင်း (Settings → Bubble ဖွင့်ပါ)\n• Wake Word (Settings → Wake Word ဖွင့်ပါ)\n\n━━━ ၆.၂ ဖုန်း နှင့် ဆက်သွယ်မှု ━━━\n📞 ဖုန်းခေါ်: \"မောင်မောင်ကို ခေါ်ပေး\" / \"call John\"\n💬 SMS: \"မမကို စာပို့ – မနက်ဖြန် လာပါ\"\n👥 Quick Contacts: Notes/Contacts မှာ နံပါတ်သိမ်းပြီး အသံနဲ့ ခေါ်ပါ\n\n━━━ ၆.၃ မှတ်စု နှင့် သတိပေး ━━━\n📝 မှတ်စု: \"မှတ်ပေး – ဈေးသွားရမယ်\" / \"add note buy milk\"\n⏰ သတိပေး: \"၃၀ မိနစ်ကြာရင် သတိပေး\" / \"remind me in 1 hour\"\n⏰ Alarm: \"နောက် ၇ နာရီမှာ alarm ထိုးပါ\"\n⏱️ Timer: \"၅ မိနစ် timer ထိုးပါ\"\n📋 Reminders/Notes: အပေါ်ဘား မှာ ကြည့်ပါ\n\n━━━ ၆.၄ Routine (အချိန်သတ်မှတ် သတိပေး) ━━━\n• \"မနက် ၇ နာရီမှာ ရာသီဥတု ပြောပြပေး\" → နေ့စဉ် ရာသီဥတု\n• \"နေ့လယ် ၁၂ နာရီ ပန်ကန်ထိုးတီး\" → သတိပေး\n• \"အပတ်စဉ် တနင်္ဂနွေ ၇ နာရီ မိခင်ခေါ်ဆက်\" → သီတင်းပတ်စဉ်\n• \"list routines\" / \"delete routine\" → စီမံခန့်ခွဲပါ\n\n━━━ ၆.၅ Proactive သတိပေးခြင်း (ကြိုပြောခြင်း) ━━━\n🌧️ မိုးရွာမယ်: မနက် ၇ နာရီမှာ မိုးရွာမယ့် နေ့များတွင် App ပွင့်ပြီး \"မိုးရွာမယ်၊ ထီးယူခဲ့ပါ\" ပြောမယ်\n📅 Meeting ရှိမယ်: Calendar မှာ meeting ထည့်ထားရင် မစခင် ၁၅ မိနစ်အလို \"Meeting X စတော့မယ်\" ပြောမယ်\n💡 Battery optimization ပိတ်ထားပါ (Settings → Apps → Luma → Battery → Unrestricted)\n\n━━━ ၆.၆ ပြက္ခဒိန် နှင့် Meeting ━━━\n📅 ဒီနေ့: \"what\'s my schedule today?\" / \"ဒီနေ့ ဘာရှိလဲ\"\n📅 မနက်ဖြန်: \"schedule tomorrow\"\n➕ ထည့်: \"add meeting at 3pm\" / \"မနက်ဖြန် ၁၀ နာရီ meeting ထည့်ပါ\"\n📆 ဖွင့်: \"open calendar\"\n▶️ Meeting Notes: \"start meeting Project Review\" → \"add note discuss budget\" → \"end meeting\"\n\n━━━ ၆.၇ ရာသီဥတု နှင့် နေရာ ━━━\n🌤️ \"ရာသီဥတု\" / \"မိုးရွာမလား\" / \"weather Yangon\"\n📍 လမ်းညွှန်: \"navigate to Sule Pagoda\"\n🏠 Home/Office: \"set home\" / \"set office\" → ရောက်တဲ့အခါ သတိပေး\n📶 Office WiFi: \"set office wifi\" → ရောက်တဲ့အခါ သတိပေး\n\n━━━ ၆.၈ သီချင်း နှင့် Media ━━━\n🎵 \"သီချင်းဖွင့်\" / \"Taylor Swift ဖွင့်\" / \"Shape of You ဖွင့်\"\n⏸️ \"pause\" / \"resume\" / \"next\" / \"previous\"\n🔊 \"volume up\" / \"volume down\"\n📱 Spotify: Settings → Spotify ချိတ်ဆက်မယ် → Login လုပ်ပါ\n\n━━━ ၆.၉ Gems (AI Personalities) ━━━\n🤖 Assistant, 📚 Teacher, 🇰🇷 Korean, 🌍 Translator, 💪 Coach, 🇲🇲 Myanmar\n💎 \"switch to teacher gem\" / \"list gems\" / \"current gem\"\n\n━━━ ၆.၁၀ ဘာသာပြန် နှင့် Call Recording ━━━\n🌐 \"translate hello to korean\" / \"ဘယ်ဘာသာလဲ – 안녕하세요\"\n📞 \"live translate myanmar to english\"\n🎙️ \"start call recording\" (ဖုန်းခေါ်ချိန် မှတ်တမ်းယူမယ်)\n\n━━━ ၆.၁၁ Voice Changer နှင့် AI Image ━━━\n🎭 \"voice changer on chipmunk\" / \"voice changer off\"\n🎨 \"generate image of a sunset\" / \"draw a cat playing piano\"\n\n━━━ ၆.၁၂ Smart Home / ကိရိယာများ ━━━\n💡 မီးအိမ်: \"flashlight ဖွင့်/ပိတ်\"\n📶 WiFi / Bluetooth: \"WiFi ဖွင့်\" / \"Bluetooth ပိတ်\"\n📷 ကင်မရာ: \"camera ဖွင့်\"\n\n━━━ ၆.၁၃ လစာမှတ်တမ်း (SalaryTracker) ━━━\n📊 \"လစာပြပေး\" / \"ဒီလလစာ\" / \"ယနေ့ရှိလား\" / \"အချိန်ပို\"\n➕ \"ယနေ့ထည့်ပေး\" / \"မနေ့ကလို\"\n💡 SalaryTracker app လိုပါတယ်\n\n━━━ ၆.၁၄ Notion ချိတ်ဆက် ━━━\n📤 \"send to notion\" / \"sync notion\"\n📝 Settings → Notion Token, Database ID ထည့်ပါ\n\n━━━ ၆.၁၅ ရှာဖွေခြင်း ━━━\n🔍 \"ယနေ့သတင်း\" (ကိုရီးယား ဦးစားပေး), \"ရာသီဥတု\" (ဒီနေရာ)\n🛒 \"Coupang မှာ ရှာပေး [ပစ္စည်း]\"\n🛒 \"AliExpress မှာ ရှာပေး [product]\"</string>
+    
+    <string name="guide_updates_title">၇. Version History</string>
+    <string name="guide_updates">📱 v2.4 — Proactive သတိပေး (မိုးရွာမယ်၊ Meeting ရှိမယ်)\n📱 v2.3 — Offline AI, Smart responses\n📱 v2.2 — Smart Home, Offline commands\n📱 v2.1 — Floating Bubble overlay\n📱 v2.0 — Translation, Call Recording, Gems, Calendar, Email, Meeting Notes, Voice Changer, AI Image Generation\n📱 v1.0 — Basic voice assistant</string>
+</resources>

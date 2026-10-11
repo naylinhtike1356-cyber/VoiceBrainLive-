@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/white">
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="48dp"
+                android:startColor="@color/assistant_primary"
+                android:endColor="@color/mic_listening" />
+            <size android:width="96dp" android:height="96dp" />
+        </shape>
+    </item>
+</ripple>

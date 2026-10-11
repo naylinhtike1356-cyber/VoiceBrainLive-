@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_gradient"
+    android:padding="24dp">
+
+    <ViewFlipper
+        android:id="@+id/onboardingFlipper"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:inAnimation="@android:anim/slide_in_left"
+        android:outAnimation="@android:anim/slide_out_right">
+
+        <!-- Step 1: API Key -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_step1_title"
+                android:textColor="@color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_step1_desc"
+                android:textColor="@color/assistant_text_secondary"
+                android:textSize="16sp"
+                android:lineSpacingMultiplier="1.2"
+                android:layout_marginBottom="32dp" />
+
+            <Button
+                android:id="@+id/btnStep1Settings"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="@string/onboarding_open_settings"
+                android:textSize="16sp"
+                android:background="@drawable/bg_button_primary"
+                android:textColor="@color/white" />
+        </LinearLayout>
+
+        <!-- Step 2: Microphone -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_step2_title"
+                android:textColor="@color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_step2_desc"
+                android:textColor="@color/assistant_text_secondary"
+                android:textSize="16sp"
+                android:lineSpacingMultiplier="1.2"
+                android:layout_marginBottom="32dp" />
+
+            <Button
+                android:id="@+id/btnStep2Allow"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="@string/onboarding_allow_mic"
+                android:textSize="16sp"
+                android:background="@drawable/bg_button_primary"
+                android:textColor="@color/white" />
+        </LinearLayout>
+
+        <!-- Step 3: Power Button Assistant -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_step3_title"
+                android:textColor="@color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/onboarding_step3_desc"
+                android:textColor="@color/assistant_text_secondary"
+                android:textSize="16sp"
+                android:lineSpacingMultiplier="1.2"
+                android:layout_marginBottom="32dp" />
+
+            <Button
+                android:id="@+id/btnStep3GetStarted"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="@string/onboarding_get_started"
+                android:textSize="16sp"
+                android:background="@drawable/bg_button_primary"
+                android:textColor="@color/white" />
+        </LinearLayout>
+    </ViewFlipper>
+
+    <!-- Bottom: Next / Skip -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/btnSkip"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/onboarding_skip"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:textColor="@color/assistant_text_secondary"
+            android:layout_marginEnd="16dp" />
+
+        <Button
+            android:id="@+id/btnNext"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/onboarding_next"
+            android:background="@drawable/bg_button_primary"
+            android:textColor="@color/white"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Step indicators -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/dot1"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/status_dot"
+            android:alpha="1" />
+        <View
+            android:id="@+id/dot2"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/status_dot"
+            android:alpha="0.4" />
+        <View
+            android:id="@+id/dot3"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/status_dot"
+            android:alpha="0.4" />
+    </LinearLayout>
+</LinearLayout>
