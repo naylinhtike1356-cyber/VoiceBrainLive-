@@ -666,8 +666,11 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
     fun clearCallbacks() {
         listener = null
-        audioRecorder.onAudioChunk = null
-        audioRecorder.onError = null
+        // First-run navigation can destroy the activity before audio initialization.
+        if (::audioRecorder.isInitialized) {
+            audioRecorder.onAudioChunk = null
+            audioRecorder.onError = null
+        }
     }
 
 

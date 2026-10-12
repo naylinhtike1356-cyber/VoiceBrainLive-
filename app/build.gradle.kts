@@ -36,8 +36,8 @@ android {
         applicationId = "com.example.voicebrainlive"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
         buildConfigField("String", "UPDATE_REPOSITORY", "\"naylinhtike1356-cyber/VoiceBrainLive-\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

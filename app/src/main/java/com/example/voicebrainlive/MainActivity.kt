@@ -39,7 +39,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     internal val viewModel: MainActivityViewModel by viewModels()
 
-    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val startupErrorHandler = CoroutineExceptionHandler { _, error ->
+        Log.e("MainActivity", "Background initialization failed", error)
+        if (!isFinishing && !isDestroyed) {
+            val message = getString(R.string.startup_background_error)
+            viewModel.updateStatus(message)
+            viewModel.updateState(AssistantState.Error(message))
+        }
+    }
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + startupErrorHandler)
     private val mainHandler = Handler(Looper.getMainLooper())
     
     private var pendingProactiveType: String? = null
@@ -48,7 +56,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingProactiveMessage: String? = null
     private var pendingConnectOnInit = false
     private val automationCommandRunner by lazy { AutomationCommandRunner(this) }
-    private val reusableTtsSpeaker by lazy { ReusableTtsSpeaker(this) }
+    private val reusableTtsSpeakerDelegate = lazy { ReusableTtsSpeaker(this) }
+    private val reusableTtsSpeaker by reusableTtsSpeakerDelegate
 
     private val permissionManager by lazy { PermissionManager(this) }
 
@@ -186,6 +195,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startWakeWordService() {
+        if (!permissionManager.hasPermission(Manifest.permission.RECORD_AUDIO)) return
         try {
             val wwIntent = Intent(this, WakeWordListenerService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -443,27 +453,35 @@ class MainActivity : AppCompatActivity() {
         if (isVoiceActive) {
             // Stop local connection to free up microphone and websocket
             viewModel.disconnect()
+
+            if (!permissionManager.hasPermission(Manifest.permission.RECORD_AUDIO)) return
             
             // Start VoiceLiveService in background
             val serviceIntent = Intent(this, VoiceLiveService::class.java).apply {
                 action = VoiceLiveService.ACTION_START
                 putExtra("EXTRA_POWER_BUTTON", false)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent)
+                } else {
+                    startService(serviceIntent)
+                }
+                VoiceLiveService.isUiVisible = false
+            } catch (error: Exception) {
+                Log.w("MainActivity", "Background voice handoff unavailable", error)
+                viewModel.updateStatus(getString(R.string.background_voice_unavailable))
             }
-            VoiceLiveService.isUiVisible = false
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         VisionCaptureBridge.onCaptureRequested = null
-        viewModel.clearCallbacks()
         mainScope.cancel()
-        reusableTtsSpeaker.shutdown()
+        mainHandler.removeCallbacksAndMessages(null)
+        viewModel.clearCallbacks()
+        if (reusableTtsSpeakerDelegate.isInitialized()) reusableTtsSpeaker.shutdown()
     }
 
     private data class AutomationRun(
