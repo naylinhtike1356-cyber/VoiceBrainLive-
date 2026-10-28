@@ -5,6 +5,7 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="secure_health_prefs.xml" />
         <!-- Exclude API keys, tokens, transcripts, and diagnostics from cloud backup. -->
         <exclude domain="sharedpref" path="secure_settings.xml" />
         <exclude domain="sharedpref" path="github_updates_secure.xml" />
@@ -15,6 +16,7 @@
         <exclude domain="external" path="Logs/" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="secure_health_prefs.xml" />
         <!-- Transfer regular app data, but never private credentials or diagnostics. -->
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="secure_settings.xml" />

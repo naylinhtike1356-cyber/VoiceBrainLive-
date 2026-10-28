@@ -40,8 +40,9 @@ object LearnedIntentExecutor {
             null
         )
 
-        val awaitingApproval = result.startsWith("NEEDS_APPROVAL:") || result.startsWith("BLOCKED:")
-        if (!awaitingApproval) IntentPatternLearner.recordPattern(
+        val unproven = listOf("NEEDS_APPROVAL:", "BLOCKED:", "FAILED:", "FAILED/OUTCOME_UNKNOWN:",
+            "UNVERIFIED:", "NOT_CONFIGURED:").any(result::startsWith)
+        if (!unproven) IntentPatternLearner.recordPattern(
             context = context,
             phrase = phrase,
             commandType = analysis.suggestedCommand,
@@ -51,7 +52,7 @@ object LearnedIntentExecutor {
 
         FastPathResult(
             resultMessage = result,
-            spokenHint = if (awaitingApproval) result else analysis.suggestionText.ifBlank { result },
+            spokenHint = if (unproven) result else analysis.suggestionText.ifBlank { result },
             commandType = analysis.suggestedCommand
         )
     }

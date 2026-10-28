@@ -59,8 +59,12 @@ class ToolRegistryImpl(
         value: String?
     ): String? {
         if (!supportsCommand(commandType)) return null
+        // UtilityHandler bytes stay untouched; its private settings write has one actual caller.
+        if (commandType.equals("set_listening_timeout", true) && !com.example.voicebrainlive.SettingsActivity.isSecureSettingsAvailable(context))
+            return com.example.voicebrainlive.security.SecureSettingsStorage.ERROR
         return com.example.voicebrainlive.commands.SensitiveActionGuard.run(context, approvalSession, commandType, target, value) {
-            dispatchSpecialized(commandType, target, value) ?: executeLegacyDispatchAsync(commandType, target, value).orEmpty()
+            try { dispatchSpecialized(commandType, target, value) ?: executeLegacyDispatchAsync(commandType, target, value).orEmpty() }
+            catch (_: com.example.voicebrainlive.security.SecureSettingsUnavailable) { com.example.voicebrainlive.security.SecureSettingsStorage.ERROR }
         }
     }
 
@@ -88,6 +92,9 @@ class ToolRegistryImpl(
         target: String?,
         value: String?
     ): String? {
+        // Existing common guard has already run. Exact scheduled targets never fall back to aliases.
+        if (commandType in setOf("open_app", "resume_music") && value?.startsWith(com.example.voicebrainlive.commands.ReviewedAppTarget.PREFIX) == true)
+            return com.example.voicebrainlive.commands.ReviewedAppTarget.dispatch(context, commandType, target, value)
         return when (commandType.lowercase()) {
             // Calling commands
             "make_call", "call", "dial", "call_contact", "call_quick_contact", "contact_call",

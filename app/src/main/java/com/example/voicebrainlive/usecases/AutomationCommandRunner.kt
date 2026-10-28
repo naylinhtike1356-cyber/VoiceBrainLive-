@@ -5,6 +5,11 @@ import com.example.voicebrainlive.OfflineCommandMatcher
 import com.example.voicebrainlive.SalaryDataReader
 import com.example.voicebrainlive.commands.PhoneCommandExecutor
 import com.example.voicebrainlive.commands.AutomationCommandValidator
+import com.example.voicebrainlive.commands.BoundedMacroRunner
+import com.example.voicebrainlive.commands.CommandSafetyPolicy
+import com.example.voicebrainlive.commands.MacroLeafRisk
+import com.example.voicebrainlive.commands.OpaqueMacroResults
+import com.example.voicebrainlive.commands.renderLegacy
 
 import com.example.voicebrainlive.weather.WeatherNarrative
 
@@ -40,19 +45,20 @@ class AutomationCommandRunner(private val context: Context) {
                 "command" -> {
                     val validation = AutomationCommandValidator.validateSequence(message, allowApprovalRequired = true)
                     if (!validation.valid) return validation.message
-                    val results = mutableListOf<String>()
-                    val commands = AutomationCommandValidator.extractSteps(message)
-                    for (subCmd in commands) {
-                        if (subCmd.contains(":")) {
-                            val parts = subCmd.split(":", limit = 3)
-                            results += formatResult(executor.executeAsync(parts[0].trim(), parts.getOrNull(1), parts.getOrNull(2)))
-                        } else {
-                            val match = OfflineCommandMatcher.match(subCmd)
-                            if (match != null) results += formatResult(executor.executeAsync(match.first, match.second, match.third))
-                            else results += "Unrecognized command."
-                        }
-                    }
-                    results.joinToString("\n")
+                    val root = "automation-${java.util.UUID.randomUUID()}"
+                    val macros = context.getSharedPreferences("custom_macros", Context.MODE_PRIVATE)
+                    BoundedMacroRunner(
+                        lookupDefinition = { id -> if (id == root) message else macros.getString(id, null) },
+                        classifyRisk = { command -> when (CommandSafetyPolicy.classify(command)) {
+                            CommandSafetyPolicy.Classification.SAFE -> MacroLeafRisk.SAFE
+                            CommandSafetyPolicy.Classification.SENSITIVE -> MacroLeafRisk.SENSITIVE
+                            CommandSafetyPolicy.Classification.UNKNOWN -> MacroLeafRisk.UNKNOWN
+                        } },
+                        dispatchThroughCommonGuard = { leaf -> OpaqueMacroResults.classify(
+                            executor.executeAsync(leaf.command, leaf.target, leaf.value)) },
+                        monotonicMillis = { android.os.SystemClock.elapsedRealtime() },
+                        fallbackValueToTarget = false
+                    ).run(root).renderLegacy()
                 }
                 "reminder" -> {
                     val match = OfflineCommandMatcher.match(message)

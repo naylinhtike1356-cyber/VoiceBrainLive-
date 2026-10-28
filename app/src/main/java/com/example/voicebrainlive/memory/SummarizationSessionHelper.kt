@@ -2,7 +2,6 @@ package com.example.voicebrainlive.memory
 
 import android.content.Context
 import android.util.Log
-import com.example.voicebrainlive.learning.PersonalProfileEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -45,7 +44,7 @@ object SummarizationSessionHelper {
             val arr = JSONArray(json)
             (0 until arr.length()).mapNotNull { i -> arr.optString(i).takeIf { it.isNotBlank() } }.toMutableList()
         } catch (e: Exception) {
-            Log.e("Summarization", "loadSummaries", e)
+            Log.e("Summarization", "loadSummaries: unavailable")
             mutableListOf()
         }
     }
@@ -56,7 +55,7 @@ object SummarizationSessionHelper {
             summaries.takeLast(MAX_SUMMARIES).forEach { arr.put(it) }
             getFile(context).writeText(arr.toString())
         } catch (e: Exception) {
-            Log.e("Summarization", "saveSummaries", e)
+            Log.e("Summarization", "saveSummaries: unavailable")
         }
     }
 
@@ -102,60 +101,20 @@ $convText
 
 Output:"""
         val response = callGeminiSummarize(apiKey, prompt, maxTokens = 1024) ?: return@withContext
-        // Parse all 4 sections
-        val (factLines, intentPatterns, personalStyle, summaryText) = parseFourSections(response)
-        if (factLines.isNotEmpty()) {
-            PersistentFactsStorage.mergeFacts(context, factLines)
-            // Also feed into PersonalProfileEngine for categorical storage
-            PersonalProfileEngine.updateFromSummary(context, factLines)
-        }
-        if (intentPatterns.isNotEmpty()) {
-            // Store intent patterns via IntentPatternLearner
-            storeIntentPatterns(context, intentPatterns)
-        }
-        if (personalStyle.isNotBlank()) {
-            PersonalProfileEngine.setFact(context, PersonalProfileEngine.CAT_STYLE, "communication_style", personalStyle)
-        }
-        if (summaryText.isNotBlank()) {
-            val summaries = loadSummaries(context)
-            summaries.add(summaryText.trim())
-            saveSummaries(context, summaries)
-            // Store embedding for semantic search
-            val summaryToStore = summaryText.trim()
-            VectorStore.store(context, apiKey, summaryToStore, type = "summary")
-            factLines.take(10).forEach { fact ->
-                if (fact.length in 5..200) VectorStore.store(context, apiKey, fact, type = "fact")
-            }
-            SessionContextProvider.invalidateCache(context)
-            Log.d("Memory", "SummarizationSessionHelper: saved summary + ${factLines.size} facts + ${intentPatterns.size} patterns + style (${summaries.size} summaries)")
-        }
-        if (factLines.isNotEmpty() || intentPatterns.isNotEmpty() || personalStyle.isNotBlank()) {
-            SessionContextProvider.invalidateCache(context)
-        }
+        saveDerivedSummaryResponse(context, response)
     }
 
-    /** Store intent patterns parsed from summarization */
-    private fun storeIntentPatterns(context: Context, patterns: List<String>) {
-        patterns.forEach { line ->
-            // Pattern: "phrase" → action_type details
-            val match = Regex("\"([^\"]+)\"\\s*→\\s*([\\w_]+)\\s*(.*)").find(line)
-            if (match != null) {
-                val phrase = match.groupValues[1].trim()
-                val action = match.groupValues[2].trim()
-                val details = match.groupValues[3].trim()
-                if (phrase.isNotBlank() && action.isNotBlank()) {
-                    com.example.voicebrainlive.learning.IntentPatternLearner.recordPattern(
-                        context = context,
-                        phrase = phrase,
-                        commandType = action,
-                        target = details.take(100),
-                        confirmedByUser = false
-                    )
-                    Log.d("Memory", "storeIntentPattern: '$phrase' → $action")
-                }
-            }
-        }
+    /** Model output is derived context, never confirmed facts, style, patterns, or authorization. */
+    internal fun saveDerivedSummaryResponse(context: Context, response: String) {
+        val summaryText = parseFourSections(response).summaryText
+        if (summaryText.isBlank()) return
+        val summaries = loadSummaries(context)
+        summaries.add(summaryText)
+        saveSummaries(context, summaries)
+        SessionContextProvider.invalidateCache(context)
+        Log.d("Memory", "Derived summary saved; durable facts and intent patterns unchanged")
     }
+
     private data class ParsedSections(
         val factLines: List<String>,
         val intentPatterns: List<String>,
@@ -229,7 +188,7 @@ Output:"""
                 .build()
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                Log.e("Summarization", "Gemini API error: ${response.code} ${response.body?.string()}")
+                Log.e("Summarization", "Summary provider request failed: HTTP ${response.code}")
                 return null
             }
             val json = JSONObject(response.body?.string() ?: "{}")
@@ -240,7 +199,7 @@ Output:"""
                 ?.optJSONObject(0)
                 ?.optString("text")
         } catch (e: Exception) {
-            Log.e("Summarization", "callGeminiSummarize", e)
+            Log.e("Summarization", "callGeminiSummarize: unavailable")
             null
         }
     }
@@ -259,7 +218,7 @@ Output:"""
             }
             Log.d("Summarization", "Cleared all session summaries")
         } catch (e: Exception) {
-            Log.e("Summarization", "clearSummaries error", e)
+            Log.e("Summarization", "clearSummaries error: unavailable")
         }
     }
 }

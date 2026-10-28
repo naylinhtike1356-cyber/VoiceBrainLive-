@@ -3,8 +3,6 @@ package com.example.voicebrainlive.health
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,36 +21,17 @@ import java.time.ZonedDateTime
 
 object HealthManager {
     private const val TAG = "HealthManager"
-    private const val PREFS_NAME = "secure_health_prefs"
     private const val KEY_HEALTH_ENABLED = "health_assistant_enabled"
     private const val KEY_LAST_SYNC_TIME = "last_health_sync_time"
     private const val KEY_DATA_SOURCE = "health_data_source"
     private const val SOURCE_HEALTH_CONNECT = "Health Connect / Samsung Health"
 
-    private fun getSecurePrefs(context: Context): SharedPreferences {
-        return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                context,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        }
-    }
-
     fun isHealthAssistantEnabled(context: Context): Boolean {
-        return getSecurePrefs(context).getBoolean(KEY_HEALTH_ENABLED, true)
+        return HealthSecureStorage.read(context, false) { it.getBoolean(KEY_HEALTH_ENABLED, true) }
     }
 
-    fun setHealthAssistantEnabled(context: Context, enabled: Boolean) {
-        getSecurePrefs(context).edit().putBoolean(KEY_HEALTH_ENABLED, enabled).apply()
-    }
+    fun setHealthAssistantEnabled(context: Context, enabled: Boolean): Boolean =
+        HealthSecureStorage.write(context) { it.putBoolean(KEY_HEALTH_ENABLED, enabled) }
 
     data class HealthData(
         val sleepHours: Double = 0.0,
@@ -73,7 +52,10 @@ object HealthManager {
     }
 
     fun fetchHealthData(context: Context): HealthData {
-        val prefs = getSecurePrefs(context)
+        return HealthSecureStorage.read(context, HealthData()) { readCachedData(it) }
+    }
+
+    private fun readCachedData(prefs: SharedPreferences): HealthData {
         return HealthData(
             sleepHours = prefs.getFloat("cached_sleep_hours", 0f).toDouble(),
             steps = prefs.getInt("cached_steps", 0),
@@ -90,7 +72,9 @@ object HealthManager {
     }
 
     suspend fun fetchHealthDataLive(context: Context): HealthData {
-        val cached = fetchHealthData(context)
+        // An unavailable vault must not lead to live provider collection or a plaintext cache.
+        val cached = HealthSecureStorage.read<HealthData?>(context, null) { readCachedData(it) }
+            ?: return HealthData()
         return try {
             if (HealthConnectClient.getSdkStatus(context, "com.google.android.apps.healthdata") != HealthConnectClient.SDK_AVAILABLE) {
                 return cached
@@ -146,11 +130,10 @@ object HealthManager {
                 lastSyncTime = System.currentTimeMillis(),
                 dataSource = SOURCE_HEALTH_CONNECT
             )
-            updateCachedHealthData(context, sleepHours = sleepHours.takeIf { it > 0 }, steps = steps.takeIf { it > 0 }, calories = calories.takeIf { it > 0 }, heartRate = heartRate.takeIf { it > 0 })
-            getSecurePrefs(context).edit().putString(KEY_DATA_SOURCE, SOURCE_HEALTH_CONNECT).apply()
-            merged
+            val saved = updateCachedHealthData(context, sleepHours = sleepHours.takeIf { it > 0 }, steps = steps.takeIf { it > 0 }, calories = calories.takeIf { it > 0 }, heartRate = heartRate.takeIf { it > 0 }, dataSource = SOURCE_HEALTH_CONNECT)
+            if (saved) merged else cached
         } catch (e: Exception) {
-            Log.w(TAG, "Live Health Connect read failed", e)
+            Log.w(TAG, "Live Health Connect read unavailable")
             cached
         }
     }
@@ -171,9 +154,9 @@ object HealthManager {
         heartRate: Int? = null,
         bedtime: String? = null,
         wakeTime: String? = null,
-        sleepQuality: String? = null
-    ) {
-        val editor = getSecurePrefs(context).edit()
+        sleepQuality: String? = null,
+        dataSource: String = "Samsung Health notification"
+    ): Boolean = HealthSecureStorage.write(context) { editor ->
         sleepHours?.let { editor.putFloat("cached_sleep_hours", it.toFloat()) }
         steps?.let { editor.putInt("cached_steps", it) }
         calories?.let { editor.putInt("cached_calories", it) }
@@ -183,9 +166,7 @@ object HealthManager {
         wakeTime?.let { editor.putString("cached_waketime", it) }
         sleepQuality?.let { editor.putString("cached_sleep_quality", it) }
         editor.putLong(KEY_LAST_SYNC_TIME, System.currentTimeMillis())
-        editor.putString(KEY_DATA_SOURCE, "Samsung Health notification")
-        editor.apply()
-        Log.d(TAG, "Health data updated: sleep=$sleepHours, steps=$steps, hr=$heartRate")
+        editor.putString(KEY_DATA_SOURCE, dataSource)
     }
 
     /**
@@ -193,6 +174,7 @@ object HealthManager {
      * e.g. "Sleep 6h 45m", "Slept 7 hrs 15 mins", "Steps: 8420"
      */
     fun parseAndSaveFromNotification(context: Context, title: String, text: String): Boolean {
+        if (!isHealthAssistantEnabled(context)) return false
         val combined = "$title $text".trim()
         if (combined.isBlank()) return false
         var updated = false
@@ -205,8 +187,7 @@ object HealthManager {
             val mins = sleepMatch.groupValues.getOrNull(2)?.toDoubleOrNull() ?: 0.0
             val totalSleep = hours + (mins / 60.0)
             if (totalSleep > 0.0 && totalSleep < 24.0) {
-                updateCachedHealthData(context, sleepHours = totalSleep)
-                updated = true
+                updated = updateCachedHealthData(context, sleepHours = totalSleep) || updated
             }
         }
 
@@ -218,8 +199,7 @@ object HealthManager {
             val parsedSteps = cleanStr.toIntOrNull()
             if (parsedSteps != null && parsedSteps > 0) {
                 val estimatedCalories = (parsedSteps * 0.04).toInt()
-                updateCachedHealthData(context, steps = parsedSteps, calories = estimatedCalories)
-                updated = true
+                updated = updateCachedHealthData(context, steps = parsedSteps, calories = estimatedCalories) || updated
             }
         }
 
@@ -229,8 +209,7 @@ object HealthManager {
         if (hrMatch != null) {
             val hr = hrMatch.groupValues[1].toIntOrNull()
             if (hr != null && hr in 40..220) {
-                updateCachedHealthData(context, heartRate = hr)
-                updated = true
+                updated = updateCachedHealthData(context, heartRate = hr) || updated
             }
         }
 

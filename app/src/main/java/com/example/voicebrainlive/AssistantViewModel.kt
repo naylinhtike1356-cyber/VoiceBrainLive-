@@ -2,11 +2,13 @@ package com.example.voicebrainlive
 
 import android.app.Application
 import android.util.Log
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.voicebrainlive.audio.AudioFocusHelper
 import com.example.voicebrainlive.audio.AudioPlayerHelper
 import com.example.voicebrainlive.audio.AudioRecorderHelper
+import com.example.voicebrainlive.audio.PlaybackDrainLease
 import com.example.voicebrainlive.commands.PhoneCommandExecutor
 import com.example.voicebrainlive.commands.CommandSafetyPolicy
 
@@ -61,6 +63,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun runWithBiometricCheck(cmd: String, target: String?, value: String?, block: suspend () -> String): String = block()
 
     var isFirstAudioChunkOfTurn = true
+    private var focusUnavailableForTurn = false
+    private val playbackDrainLease = PlaybackDrainLease()
+    private var playbackDrainJob: Job? = null
     var currentUserInput: String = "🎤"
     var currentAiResponse: String = ""
     var isAutomationMode = false
@@ -75,7 +80,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (service != null) {
             service.sendTextInput(text)
         } else {
-            geminiClient.sendTextInput(text)
+            geminiClient.sendConversationInput(text)
         }
     }
 
@@ -159,7 +164,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         audioRecorder = AudioRecorderHelper().apply {
             useVoiceCommunicationForNoisyEnv = SettingsActivity.isNoisyEnvMode(app)
         }
-        audioPlayer = AudioPlayerHelper()
+        audioPlayer = AudioPlayerHelper().apply {
+            onError = { message -> this@AssistantViewModel.listener?.onError(message) }
+        }
     }
 
     /** viewModelScope သုံးပြီး mic start – LifecycleScope equivalent */
@@ -174,16 +181,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun playAudioChunk(base64: String) {
+        val player = audioPlayer
+        val producer = if (!FocusMode.isActive(app)) player.captureStartedProducer() else null
+        if (producer != null) {
+            enqueuePlayback(player, producer) { playAudioChunk(player, producer, base64) }
+        }
+    }
+
+    private fun playAudioChunk(player: AudioPlayerHelper,
+        producer: com.example.voicebrainlive.audio.BoundedPlaybackController.Producer, base64: String) {
         if (!FocusMode.isActive(app)) {
-            if (isFirstAudioChunkOfTurn) {
-                AudioFocusHelper.requestForSpeech(app)
-                isFirstAudioChunkOfTurn = false
-            }
-            if (!audioPlayer.isPlaying()) {
-                audioPlayer.start()
-            }
             try {
-                audioPlayer.playBase64(base64)
+                player.playBase64(producer, base64)
             } catch (e: Exception) {
                 Log.e("AssistantViewModel", "playBase64", e)
             }
@@ -191,16 +200,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun playAudioBytes(bytes: ByteArray) {
+        val player = audioPlayer
+        val producer = if (!FocusMode.isActive(app)) player.captureStartedProducer() else null
+        if (producer != null) {
+            enqueuePlayback(player, producer) { playAudioBytes(player, producer, bytes) }
+        }
+    }
+
+    private fun playAudioBytes(player: AudioPlayerHelper,
+        producer: com.example.voicebrainlive.audio.BoundedPlaybackController.Producer, bytes: ByteArray) {
         if (!FocusMode.isActive(app)) {
-            if (isFirstAudioChunkOfTurn) {
-                AudioFocusHelper.requestForSpeech(app)
-                isFirstAudioChunkOfTurn = false
-            }
-            if (!audioPlayer.isPlaying()) {
-                audioPlayer.start()
-            }
             try {
-                audioPlayer.playRaw(bytes)
+                player.playRaw(producer, bytes)
             } catch (e: Exception) {
                 Log.e("AssistantViewModel", "playRaw", e)
             }
@@ -208,23 +219,75 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onTurnCompleteOrInterrupted(onDone: () -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            // Wait longer if the player is still finishing last chunks from the queue
-            var timeout = 0
-            while (audioPlayer.isActuallySpeaking() && timeout < 25000) {
-                kotlinx.coroutines.delay(100)
-                timeout += 100
-            }
-            // Add a small extra delay to let the AudioTrack internal buffer drain to the speaker
-            kotlinx.coroutines.delay(500)
-            
-            AudioFocusHelper.abandon(app)
-            isFirstAudioChunkOfTurn = true
-            
-            kotlinx.coroutines.withContext(Dispatchers.Main) {
-                onDone()
+        val player = audioPlayer
+        // All lease mutations/registrations occur on Main, avoiding Epoch -> lease lock waits.
+        viewModelScope.launch(Dispatchers.Main) {
+            playbackDrainLease.replace { token ->
+                playbackDrainJob?.cancel()
+                playbackDrainJob = viewModelScope.launch(Dispatchers.IO) {
+                    var timeout = 0
+                    while (player.isActuallySpeaking() && timeout < 25000) {
+                        kotlinx.coroutines.delay(100)
+                        timeout += 100
+                    }
+                    // Approximate native drain allowance, not measured audible completion.
+                    kotlinx.coroutines.delay(500)
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        playbackDrainLease.withCurrent(token) {
+                            AudioFocusHelper.abandon(app, player)
+                            isFirstAudioChunkOfTurn = true
+                            focusUnavailableForTurn = false
+                            onDone()
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private fun enqueuePlayback(player: AudioPlayerHelper,
+        producer: com.example.voicebrainlive.audio.BoundedPlaybackController.Producer, action: () -> Unit) {
+        viewModelScope.launch(Dispatchers.Main) {
+            // A queued pre-interrupt/disconnect frame cannot change focus or listener/UI state.
+            if (!player.isCurrentProducer(producer) || FocusMode.isActive(app)) return@launch
+            if (!preparePlaybackTurn(player)) return@launch
+            action()
+        }
+    }
+
+    private fun preparePlaybackTurn(player: AudioPlayerHelper): Boolean {
+        var allowed = false
+        playbackDrainLease.replace {
+            playbackDrainJob?.cancel()
+            playbackDrainJob = null
+            if (focusUnavailableForTurn) return@replace
+            if (isFirstAudioChunkOfTurn) {
+                if (!AudioFocusHelper.requestForSpeech(app, player)) {
+                    focusUnavailableForTurn = true
+                    player.onError?.invoke("Audio focus unavailable; text response remains available.")
+                    return@replace
+                }
+                isFirstAudioChunkOfTurn = false
+            }
+            allowed = true
+        }
+        return allowed
+    }
+
+    private fun cancelPlaybackDrain() {
+        val player = audioPlayer
+        val revoke = {
+            playbackDrainLease.revoke {
+                playbackDrainJob?.cancel()
+                playbackDrainJob = null
+                AudioFocusHelper.abandon(app, player)
+                isFirstAudioChunkOfTurn = true
+                focusUnavailableForTurn = false
+            }
+        }
+        // Teardown may already have cancelled viewModelScope; Main cleanup must still execute.
+        if (Looper.myLooper() == Looper.getMainLooper()) revoke()
+        else viewModelScope.launch(Dispatchers.Main) { revoke() }
     }
 
     private fun saveConversationMemory(userText: String, assistantText: String) {
@@ -243,6 +306,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** onDestroy မှာ ခေါ်ပါ – callbacks ဖြုတ်မှ Context Leak မဖြစ်ဘူး */
     fun clearCallbacks() {
+        geminiClient.invalidateAgentContext()
+        cancelPlaybackDrain()
                 listener = null
         audioRecorder.onAudioChunk = null
         audioRecorder.onError = null
@@ -253,6 +318,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         geminiClient.onAudioChunk = null
         geminiClient.onAudioBytes = null
         geminiClient.onTranscript = null
+        geminiClient.onAgentTranscript = null
+        geminiClient.agentFactory = null
         geminiClient.onInputTranscript = null
         geminiClient.onOutputTranscript = null
         geminiClient.onTurnComplete = null
@@ -264,6 +331,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
+        cancelPlaybackDrain()
         phoneExecutor.invalidateApprovals()
         super.onCleared()
         clearCallbacks()
@@ -279,7 +347,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setupCallbacks(listener: AssistantViewModelListener) {
+        cancelPlaybackDrain()
         this.listener = listener
+        geminiClient.invalidateAgentContext()
+        geminiClient.agentFactory = if (isAutomationMode) null else { session, current, display ->
+            com.example.voicebrainlive.agent.brain.AndroidConversationAgent.create(app, session, { current() && !isAutomationMode }, display)
+        }
+        geminiClient.onAgentTranscript = { text, current -> if (current()) this.listener?.onAgentTranscript(text, current) }
         val callbackClient = geminiClient
         callbackClient.onConnected = connected@{
             if (geminiClient !== callbackClient) return@connected
@@ -326,15 +400,23 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         }
-        geminiClient.onDisconnected = { _ -> phoneExecutor.invalidateApprovals(); this.listener?.onDisconnected() }
-        geminiClient.onReconnecting = { attempt, delayMs -> phoneExecutor.invalidateApprovals(); this.listener?.onReconnecting(attempt, delayMs) }
+        geminiClient.onDisconnected = { _ -> cancelPlaybackDrain(); audioPlayer.stop(); phoneExecutor.invalidateApprovals(); this.listener?.onDisconnected() }
+        geminiClient.onReconnecting = { attempt, delayMs -> cancelPlaybackDrain(); audioPlayer.stop(); phoneExecutor.invalidateApprovals(); this.listener?.onReconnecting(attempt, delayMs) }
         geminiClient.onAudioChunk = { base64 ->
-            this.listener?.onAudioChunk(base64)
-            playAudioChunk(base64)
+            val player = audioPlayer
+            val producer = if (!FocusMode.isActive(app)) player.captureStartedProducer() else null
+            if (producer != null) enqueuePlayback(player, producer) {
+                this.listener?.onAudioChunk(base64)
+                playAudioChunk(player, producer, base64)
+            }
         }
         geminiClient.onAudioBytes = { bytes ->
-            this.listener?.onAudioBytes(bytes)
-            playAudioBytes(bytes)
+            val player = audioPlayer
+            val producer = if (!FocusMode.isActive(app)) player.captureStartedProducer() else null
+            if (producer != null) enqueuePlayback(player, producer) {
+                this.listener?.onAudioBytes(bytes)
+                playAudioBytes(player, producer, bytes)
+            }
         }
         geminiClient.onTranscript = { text -> 
             currentAiResponse += text
@@ -361,6 +443,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         geminiClient.onInterrupted = {
+            cancelPlaybackDrain()
             if (currentAiResponse.isNotBlank()) {
                 VoiceHistory.add(app, currentUserInput, currentAiResponse.trim() + " (Interrupted)")
                 saveConversationMemory(currentUserInput, currentAiResponse.trim() + " (Interrupted)")
@@ -412,6 +495,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         fun onAudioChunk(base64: String)
         fun onAudioBytes(bytes: ByteArray)
         fun onTranscript(text: String)
+        fun onAgentTranscript(text: String, current: () -> Boolean) {}
         fun onInputTranscript(text: String)
         fun onTaskStarted()
         fun onTurnComplete()

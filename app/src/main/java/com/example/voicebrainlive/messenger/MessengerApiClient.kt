@@ -51,6 +51,7 @@ class MessengerApiClient(private val context: Context) {
      * Returns Pair(pageId, pageAccessToken) or null on failure.
      */
     fun fetchPageTokenFromUserToken(userToken: String): Pair<String, String>? {
+        if (!SettingsActivity.isSecureSettingsAvailable(context)) return null
         if (cachedPageToken != null && cachedPageId != null) {
             return Pair(cachedPageId!!, cachedPageToken!!)
         }
@@ -91,7 +92,7 @@ class MessengerApiClient(private val context: Context) {
      * Returns null if neither is available.
      */
     private fun getEffectivePageToken(): String? {
-        val prefs = SettingsActivity.getSecurePrefs(context)
+        val prefs = SettingsActivity.trySecurePrefs(context) ?: return null
         val pageToken = prefs.getString(PREF_MESSENGER_TOKEN, "")
         if (!pageToken.isNullOrBlank()) return pageToken
 
@@ -105,7 +106,7 @@ class MessengerApiClient(private val context: Context) {
 
     /** Returns user token if set, null otherwise */
     private fun getUserToken(): String? {
-        val t = SettingsActivity.getSecurePrefs(context).getString(PREF_MESSENGER_USER_TOKEN, "")
+        val t = SettingsActivity.trySecurePrefs(context)?.getString(PREF_MESSENGER_USER_TOKEN, "")
         return if (t.isNullOrBlank()) null else t
     }
 
@@ -116,6 +117,7 @@ class MessengerApiClient(private val context: Context) {
      * Returns PSID string if found, null otherwise.
      */
     fun lookupPsidByName(name: String): String? {
+        if (!SettingsActivity.isSecureSettingsAvailable(context)) return null
         val searchName = name.trim().lowercase()
         if (searchName == "__prefetch__") {
             // Just warm up the cache, don't search
@@ -148,7 +150,7 @@ class MessengerApiClient(private val context: Context) {
             pageIdToSkip = result.first
         } else {
             // Fallback: try direct page token, but /me/conversations may require read_mailbox
-            token = SettingsActivity.getSecurePrefs(context).getString(PREF_MESSENGER_TOKEN, "") ?: return
+            token = SettingsActivity.trySecurePrefs(context)?.getString(PREF_MESSENGER_TOKEN, "")?.takeIf { it.isNotBlank() } ?: return
             pageIdToSkip = cachedPageId ?: ""
         }
 
@@ -267,7 +269,7 @@ class MessengerApiClient(private val context: Context) {
      * Priority: User Token → /me/accounts (explicit pageId) > direct Page Token (pageId="me" fallback)
      */
     private fun resolveTokenAndPageId(): Pair<String, String>? {
-        val prefs = SettingsActivity.getSecurePrefs(context)
+        val prefs = SettingsActivity.trySecurePrefs(context) ?: return null
         // Prefer User Token path — gives us explicit pageId (avoids "me" ambiguity)
         val userToken = prefs.getString(PREF_MESSENGER_USER_TOKEN, "")
         if (!userToken.isNullOrBlank()) {
@@ -304,7 +306,11 @@ class MessengerApiClient(private val context: Context) {
         pageCallback: (String) -> Unit,
         userCallback: (String) -> Unit
     ) {
-        val prefs = SettingsActivity.getSecurePrefs(context)
+        val prefs = SettingsActivity.trySecurePrefs(context) ?: run {
+            pageCallback(com.example.voicebrainlive.security.SecureSettingsStorage.ERROR)
+            userCallback(com.example.voicebrainlive.security.SecureSettingsStorage.ERROR)
+            return
+        }
         val pageToken = prefs.getString(PREF_MESSENGER_TOKEN, "")
         val userToken = prefs.getString(PREF_MESSENGER_USER_TOKEN, "")
 

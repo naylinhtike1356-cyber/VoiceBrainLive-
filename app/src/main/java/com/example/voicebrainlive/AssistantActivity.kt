@@ -127,6 +127,7 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
     }
 
     override fun onPause() {
+        conversationAgentDialog?.close(); conversationAgentDialog = null
         com.example.voicebrainlive.commands.ApprovalUiLease.pause(this)
         super.onPause()
     }
@@ -544,6 +545,17 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
             composeVoiceStatus = VoiceStatus.SPEAKING
             setBreathingState(true)
             startSpeakingAnimation()
+        }
+    }
+
+    private var conversationAgentDialog: com.example.voicebrainlive.agent.brain.AgentConversationDialog? = null
+    override fun onAgentTranscript(text: String, current: () -> Boolean) {
+        runOnUiThread {
+            if (!current() || isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@runOnUiThread
+            val local = conversationAgentDialog ?: com.example.voicebrainlive.agent.brain.AgentConversationDialog(this) {
+                viewModel.sendTextInput(it)
+            }.also { conversationAgentDialog = it }
+            local.show(text)
         }
     }
 

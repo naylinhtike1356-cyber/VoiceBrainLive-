@@ -86,7 +86,17 @@
         android:roundIcon="@drawable/luma_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.VoiceBrainLive">
+        <activity android:name=".memory.confirmed.ConfirmedMemoryActivity" android:exported="false" />
         <activity android:name=".updates.AppUpdateActivity" android:exported="false" />
+        <activity android:name=".agent.AgentTasksActivity" android:exported="false" />
+        <activity android:name=".agent.brain.AgentActivityInboxActivity" android:exported="false" />
+        <activity android:name=".agent.background.ScheduledAgentTasksActivity" android:exported="false" />
+        <activity android:name=".agent.background.ScheduledRequestsActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".agent.proactive.ProactiveRulesActivity" android:exported="false" />
+        <activity android:name=".agent.notion.NotionProfilesActivity" android:exported="false" />
+        <activity android:name=".agent.connected.ConnectedAgentActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".agent.connected.ConnectedSettingsActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".agent.connected.ConnectedTasksActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         
         <!-- Disable Startup initializers that may crash (ProfileInstaller, EmojiCompat) -->
         <provider

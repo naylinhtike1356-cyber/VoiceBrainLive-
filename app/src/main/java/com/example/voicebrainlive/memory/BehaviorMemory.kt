@@ -173,7 +173,7 @@ object BehaviorMemory {
         if (query.isBlank()) return
         try {
             val obj = load(context)
-                        obj.put("lastMusic", query.take(100).trim())
+            obj.put("lastMusic", query.take(100).trim())
             obj.put("lastMusicAt", System.currentTimeMillis())
             save(context, obj)
 

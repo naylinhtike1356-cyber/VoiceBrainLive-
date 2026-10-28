@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="about_updates_title">About &amp; Updates</string>
+    <string name="about_updates_back">Back</string>
+    <string name="about_updates_check">Check for updates</string>
+</resources>

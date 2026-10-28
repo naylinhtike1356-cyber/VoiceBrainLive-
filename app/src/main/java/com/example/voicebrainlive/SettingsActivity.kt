@@ -22,8 +22,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.example.voicebrainlive.databinding.ActivitySettingsBinding
 import com.example.voicebrainlive.MediaSessionHelper
 import com.example.voicebrainlive.SpotifyManager
@@ -39,6 +37,7 @@ class SettingsActivity : FragmentActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var securePrefs: SharedPreferences
+    private var settingsStorageReady = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -78,188 +77,57 @@ class SettingsActivity : FragmentActivity() {
         const val KEY_HEALTH_ASSISTANT_ENABLED = "health_assistant_enabled"
         const val KEY_HEALTH_ROUTINE_TIME = "health_routine_time"
 
-        fun isHealthAssistantEnabled(context: Context): Boolean =
-            getSecurePrefs(context).getBoolean(KEY_HEALTH_ASSISTANT_ENABLED, true)
-
-        fun getHealthRoutineTime(context: Context): String =
-            getSecurePrefs(context).getString(KEY_HEALTH_ROUTINE_TIME, "08:00") ?: "08:00"
-        /** Future Silero VAD gate – see docs/PHASE_E_DEFERRED.md */
         const val KEY_VAD_ENABLED = "vad_enabled"
         const val KEY_TEST_CALL_MODE = "test_call_mode"
+        private const val DEFAULT_MODEL = "models/gemini-3.1-flash-live-preview"
+        private fun <T> readSecure(context: Context, unavailable: T, block: (SharedPreferences) -> T): T =
+            com.example.voicebrainlive.security.SecureSettingsStorage.read(context, unavailable, block)
+        fun getSecurePrefs(context: Context): SharedPreferences = com.example.voicebrainlive.security.SecureSettingsStorage.require(context)
+        fun trySecurePrefs(context: Context): SharedPreferences? = com.example.voicebrainlive.security.SecureSettingsStorage.optional(context)
+        fun isSecureSettingsAvailable(context: Context): Boolean = trySecurePrefs(context) != null
 
-        fun getSelectedNotificationApps(context: Context): Set<String> {
-            val prefs = getSecurePrefs(context)
-            val defaultApps = setOf(
-                "com.facebook.orca", "com.whatsapp", "com.google.android.apps.messaging",
-                "com.samsung.android.messaging", "com.samsung.android.weather",
-                "com.google.android.weather", "com.facebook.katana"
-            )
-            return prefs.getStringSet(KEY_SELECTED_NOTIFICATION_APPS, defaultApps) ?: defaultApps
+        fun isHealthAssistantEnabled(context: Context): Boolean = readSecure(context, false) { it.getBoolean(KEY_HEALTH_ASSISTANT_ENABLED, true) }
+        fun getHealthRoutineTime(context: Context): String = readSecure(context, "08:00") { it.getString(KEY_HEALTH_ROUTINE_TIME, "08:00") ?: "08:00" }
+        fun getSelectedNotificationApps(context: Context): Set<String> = readSecure(context, emptySet()) {
+            val defaults = setOf("com.facebook.orca", "com.whatsapp", "com.google.android.apps.messaging", "com.samsung.android.messaging", "com.samsung.android.weather", "com.google.android.weather", "com.facebook.katana")
+            it.getStringSet(KEY_SELECTED_NOTIFICATION_APPS, defaults)?.toSet() ?: defaults
         }
-
-        fun getNotificationAutoTimeoutSeconds(context: Context): Int {
-            return getSecurePrefs(context).getInt(KEY_NOTIFICATION_AUTO_TIMEOUT_SECONDS, 10)
+        fun getNotificationAutoTimeoutSeconds(context: Context): Int = readSecure(context, 10) { it.getInt(KEY_NOTIFICATION_AUTO_TIMEOUT_SECONDS, 10) }
+        fun isVadEnabled(context: Context): Boolean = readSecure(context, false) { it.getBoolean(KEY_VAD_ENABLED, false) }
+        fun isVoiceProfileEnabled(context: Context): Boolean = readSecure(context, true) { it.getBoolean(KEY_VOICE_PROFILE_ENABLED, false) }
+        fun isTestCallMode(context: Context): Boolean = readSecure(context, true) { it.getBoolean(KEY_TEST_CALL_MODE, false) }
+        fun getGeminiApiKey(context: Context): String = readSecure(context, "") {
+            it.getString(KEY_GEMINI_API, null)?.takeIf(String::isNotBlank) ?: BuildConfig.GEMINI_API_KEY
         }
-
-        fun isVadEnabled(context: Context): Boolean {
-            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getBoolean(KEY_VAD_ENABLED, false)
+        fun getGeminiModel(context: Context): String = readSecure(context, DEFAULT_MODEL) {
+            it.getString(KEY_GEMINI_MODEL, DEFAULT_MODEL)?.takeIf { m -> m.isNotBlank() && !m.contains("gemini-2.0-flash-exp", true) } ?: DEFAULT_MODEL
         }
-
-        fun isVoiceProfileEnabled(context: Context): Boolean =
-            getSecurePrefs(context).getBoolean(KEY_VOICE_PROFILE_ENABLED, false)
-
-        fun isTestCallMode(context: Context): Boolean =
-            getSecurePrefs(context).getBoolean(KEY_TEST_CALL_MODE, false)
-
-        /**
-         * Returns SharedPreferences backed by Android Keystore.
-         * API keys and tokens are encrypted with AES256-GCM.
-         * Keys are stored in hardware-backed Keystore when available.
-         */
-        fun getSecurePrefs(context: Context): SharedPreferences {
-            return try {
-                val masterKey = MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .setUserAuthenticationRequired(false) // Keys available when device locked
-                    .build()
-
-                EncryptedSharedPreferences.create(
-                    context,
-                    PREFS_NAME,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
-            } catch (e: Exception) {
-                Log.e("SettingsActivity", "EncryptedSharedPreferences creation failed, falling back to plaintext storage!", e)
-                try {
-                    com.example.voicebrainlive.ActionRecordManager.recordAction(context, "Security", "EncryptedSharedPreferences failed, fallback to plaintext: ${e.message}", isError = true)
-                } catch (_: Exception) {}
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            }
+        fun saveGeminiModel(context: Context, model: String): Boolean = com.example.voicebrainlive.security.SecureSettingsStorage.write(context) { it.putString(KEY_GEMINI_MODEL, model) }
+        fun getOpenAIApiKey(context: Context): String? = readSecure(context, null as String?) {
+            it.getString(KEY_OPENAI_API, null)?.takeIf(String::isNotBlank) ?: BuildConfig.OPENAI_API_KEY.takeIf(String::isNotBlank)
         }
-
-        fun getGeminiApiKey(context: Context): String {
-            val prefs = getSecurePrefs(context)
-            val savedKey = prefs.getString(KEY_GEMINI_API, null)
-            return if (!savedKey.isNullOrBlank()) {
-                savedKey
-            } else {
-                BuildConfig.GEMINI_API_KEY
-            }
+        fun getNotionToken(context: Context): String? = readSecure(context, null as String?) { it.getString(KEY_NOTION_TOKEN, null) }
+        fun getNotionDatabaseId(context: Context): String? = readSecure(context, null as String?) { it.getString(KEY_NOTION_DATABASE_ID, null) }
+        fun getVoice(context: Context): String = readSecure(context, "Aoede") { it.getString(KEY_VOICE, "Aoede") ?: "Aoede" }
+        fun isShowErrorDetails(context: Context): Boolean = readSecure(context, false) { it.getBoolean(KEY_SHOW_ERROR_DETAILS, false) }
+        fun isNoisyEnvMode(context: Context): Boolean = readSecure(context, false) { it.getBoolean(KEY_NOISY_ENV_MODE, false) }
+        fun getIdleTimeoutMinutes(context: Context): Int = readSecure(context, 2) { it.getInt(KEY_IDLE_TIMEOUT_MINUTES, 0) }
+        fun getSilenceTimeoutSeconds(context: Context): Int = readSecure(context, 3) {
+            val value = it.getInt(KEY_SILENCE_TIMEOUT_VALUE, 3)
+            when (it.getString(KEY_SILENCE_TIMEOUT_UNIT, "s")) { "m" -> value * 60; "h" -> value * 3600; else -> value }
         }
-
-        fun getGeminiModel(context: Context): String {
-            val prefs = getSecurePrefs(context)
-            val model = prefs.getString(KEY_GEMINI_MODEL, "models/gemini-3.1-flash-live-preview")
-                ?: "models/gemini-3.1-flash-live-preview"
-            if (model.contains("gemini-2.0-flash-exp", ignoreCase = true) || model.isBlank()) {
-                val fixed = "models/gemini-3.1-flash-live-preview"
-                saveGeminiModel(context, fixed)
-                return fixed
-            }
-            return model
+        fun getTimezoneId(context: Context): String = readSecure(context, "") { it.getString(KEY_TIMEZONE_ID, "") ?: "" }
+        fun getTimezone(context: Context): java.util.TimeZone = getTimezoneId(context).let { if (it.isBlank()) java.util.TimeZone.getDefault() else java.util.TimeZone.getTimeZone(it) }
+        fun getReminderRepeatMinutes(context: Context): Int = readSecure(context, 0) { it.getInt(KEY_REMINDER_REPEAT_MINUTES, 0) }
+        fun getSpotifyAccessToken(context: Context): String? = readSecure(context, null as String?) { it.getString(KEY_SPOTIFY_ACCESS_TOKEN, null) }
+        fun getSpotifyRefreshToken(context: Context): String? = readSecure(context, null as String?) { it.getString(KEY_SPOTIFY_REFRESH_TOKEN, null) }
+        fun saveSpotifyTokens(context: Context, accessToken: String, refreshToken: String?): Boolean = com.example.voicebrainlive.security.SecureSettingsStorage.write(context) {
+            it.putString(KEY_SPOTIFY_ACCESS_TOKEN, accessToken); if (refreshToken != null) it.putString(KEY_SPOTIFY_REFRESH_TOKEN, refreshToken)
         }
-
-        fun saveGeminiModel(context: Context, model: String) {
-            getSecurePrefs(context).edit().putString(KEY_GEMINI_MODEL, model).apply()
-        }
-
-        /** OpenAI API key for DALL-E image generation (add OPENAI_API_KEY in gradle.properties) */
-        fun getOpenAIApiKey(context: Context): String? {
-            val prefs = getSecurePrefs(context)
-            val savedKey = prefs.getString(KEY_OPENAI_API, null)
-            return when {
-                !savedKey.isNullOrBlank() -> savedKey
-                !BuildConfig.OPENAI_API_KEY.isNullOrBlank() -> BuildConfig.OPENAI_API_KEY
-                else -> null
-            }
-        }
-
-        fun getNotionToken(context: Context): String? {
-            return getSecurePrefs(context).getString(KEY_NOTION_TOKEN, null)
-        }
-
-        fun getNotionDatabaseId(context: Context): String? {
-            return getSecurePrefs(context).getString(KEY_NOTION_DATABASE_ID, null)
-        }
-
-        /** v2.0: Voice for Gemini (Aoede, Charon, Fenrir, Kore, Puck, Zephyr) */
-        fun getVoice(context: Context): String =
-            getSecurePrefs(context).getString(KEY_VOICE, "Aoede") ?: "Aoede"
-
-        /** When true, Toast shows raw error for debugging. */
-        fun isShowErrorDetails(context: Context): Boolean =
-            getSecurePrefs(context).getBoolean(KEY_SHOW_ERROR_DETAILS, false)
-
-        /** When true, use VOICE_COMMUNICATION for better noise filter + soft speech in noisy env. */
-        fun isNoisyEnvMode(context: Context): Boolean =
-            getSecurePrefs(context).getBoolean(KEY_NOISY_ENV_MODE, false)
-
-        /** Idle timeout in minutes: 0 = never auto-close. When listening with no command, auto-close after this. */
-        fun getIdleTimeoutMinutes(context: Context): Int =
-            getSecurePrefs(context).getInt(KEY_IDLE_TIMEOUT_MINUTES, 0)
-
-        /** Silence timeout in seconds: 0 = never auto-stop listening. */
-        fun getSilenceTimeoutSeconds(context: Context): Int {
-            val prefs = getSecurePrefs(context)
-            val value = prefs.getInt(KEY_SILENCE_TIMEOUT_VALUE, 3) // Faster response default
-            val unit = prefs.getString(KEY_SILENCE_TIMEOUT_UNIT, "s") ?: "s"
-            return when (unit) {
-                "m" -> value * 60
-                "h" -> value * 3600
-                else -> value
-            }
-        }
-
-        /** Timezone ID for reminders (e.g. Asia/Yangon). Empty = device default. */
-        fun getTimezoneId(context: Context): String =
-            getSecurePrefs(context).getString(KEY_TIMEZONE_ID, "") ?: ""
-
-        fun getTimezone(context: Context): java.util.TimeZone {
-            val id = getTimezoneId(context)
-            return if (id.isNotBlank()) {
-                java.util.TimeZone.getTimeZone(id)
-            } else {
-                java.util.TimeZone.getDefault()
-            }
-        }
-
-        /** Reminder repeat: 0 = no repeat. When > 0, re-alert every N minutes until user dismisses. */
-        fun getReminderRepeatMinutes(context: Context): Int =
-            getSecurePrefs(context).getInt(KEY_REMINDER_REPEAT_MINUTES, 0)
-
-        fun getSpotifyAccessToken(context: Context): String? =
-            getSecurePrefs(context).getString(KEY_SPOTIFY_ACCESS_TOKEN, null)
-
-        fun getSpotifyRefreshToken(context: Context): String? =
-            getSecurePrefs(context).getString(KEY_SPOTIFY_REFRESH_TOKEN, null)
-
-        fun saveSpotifyTokens(context: Context, accessToken: String, refreshToken: String?) {
-            getSecurePrefs(context).edit().apply {
-                putString(KEY_SPOTIFY_ACCESS_TOKEN, accessToken)
-                if (refreshToken != null) putString(KEY_SPOTIFY_REFRESH_TOKEN, refreshToken)
-            }.apply()
-        }
-
-        fun clearSpotifyTokens(context: Context) {
-            getSecurePrefs(context).edit()
-                .remove(KEY_SPOTIFY_ACCESS_TOKEN)
-                .remove(KEY_SPOTIFY_REFRESH_TOKEN)
-                .apply()
-        }
-
-        fun setSpotifyPkceVerifier(context: Context, verifier: String) {
-            getSecurePrefs(context).edit().putString(KEY_SPOTIFY_PKCE_VERIFIER, verifier).apply()
-        }
-
-        fun getSpotifyPkceVerifier(context: Context): String? =
-            getSecurePrefs(context).getString(KEY_SPOTIFY_PKCE_VERIFIER, null)
-
-        fun clearSpotifyPkceVerifier(context: Context) {
-            getSecurePrefs(context).edit().remove(KEY_SPOTIFY_PKCE_VERIFIER).apply()
-        }
+        fun clearSpotifyTokens(context: Context): Boolean = com.example.voicebrainlive.security.SecureSettingsStorage.write(context) { it.remove(KEY_SPOTIFY_ACCESS_TOKEN).remove(KEY_SPOTIFY_REFRESH_TOKEN) }
+        fun setSpotifyPkceVerifier(context: Context, verifier: String): Boolean = com.example.voicebrainlive.security.SecureSettingsStorage.write(context) { it.putString(KEY_SPOTIFY_PKCE_VERIFIER, verifier) }
+        fun getSpotifyPkceVerifier(context: Context): String? = readSecure(context, null as String?) { it.getString(KEY_SPOTIFY_PKCE_VERIFIER, null) }
+        fun clearSpotifyPkceVerifier(context: Context): Boolean = com.example.voicebrainlive.security.SecureSettingsStorage.write(context) { it.remove(KEY_SPOTIFY_PKCE_VERIFIER) }
     }
 
     private fun generateSpotifyPkce(): Pair<String, String> {
@@ -275,6 +143,14 @@ class SettingsActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeUtils.applyTheme(this)
         super.onCreate(savedInstanceState)
+        (application as? com.example.voicebrainlive.ui.InteractiveBetaSettings)?.let {
+            it.renderBetaSettings(this)
+            return
+        }
+        securePrefs = try { getSecurePrefs(this) } catch (_: com.example.voicebrainlive.security.SecureSettingsUnavailable) {
+            showSecureStorageUnavailable(); return
+        }
+        settingsStorageReady = true
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
@@ -282,14 +158,40 @@ class SettingsActivity : FragmentActivity() {
             binding.root.setBackgroundResource(R.drawable.bg_gradient_light)
         }
 
-        securePrefs = getSecurePrefs(this)
-
-        loadSettings()
+        try { loadSettings() } catch (_: Exception) { showSecureStorageUnavailable(); return }
         setupListeners()
-        binding.btnAppUpdates.text = "App updates (${BuildConfig.VERSION_NAME})"
+        binding.btnAppUpdates.text = "အက်ပ်အကြောင်းနှင့် အပ်ဒိတ် (${BuildConfig.VERSION_NAME})"
         binding.btnAppUpdates.setOnClickListener {
             startActivity(Intent(this, com.example.voicebrainlive.updates.AppUpdateActivity::class.java))
         }
+        binding.btnAutomationHub.setOnClickListener {
+            startActivity(Intent(this, AutomationActivity::class.java))
+        }
+        binding.btnToggleLabs.setOnClickListener {
+            val expanded = binding.labsSection.visibility != android.view.View.VISIBLE
+            binding.labsSection.visibility = if (expanded) android.view.View.VISIBLE else android.view.View.GONE
+            binding.btnToggleLabs.setIconResource(if (expanded) android.R.drawable.arrow_up_float else android.R.drawable.arrow_down_float)
+            androidx.core.view.ViewCompat.setStateDescription(binding.btnToggleLabs, if (expanded) "ဖွင့်ထားသည်" else "ပိတ်ထားသည်")
+        }
+        binding.btnDirectNotionProfiles.setOnClickListener {
+            startActivity(Intent(this, com.example.voicebrainlive.agent.connected.ConnectedSettingsActivity::class.java))
+        }
+        binding.btnDirectNotionProfiles.text = "AI နှင့် Notion ချိတ်ဆက်ရန်"
+        binding.btnProactiveRules.setOnClickListener {
+            startActivity(Intent(this, com.example.voicebrainlive.agent.proactive.ProactiveRulesActivity::class.java))
+        }
+        binding.btnProactiveRules.text = "စမ်းသပ်ခန်း — အခြေအနေစစ် စည်းမျဉ်းများ"
+    }
+
+    private fun showSecureStorageUnavailable() {
+        settingsStorageReady = false
+        val body = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL; setPadding(32, 32, 32, 32)
+            addView(android.widget.TextView(context).apply { text = com.example.voicebrainlive.security.SecureSettingsStorage.ERROR; textSize = 18f })
+            addView(android.widget.Button(context).apply { text = "Retry"; setOnClickListener { recreate() } })
+            addView(android.widget.Button(context).apply { text = "Back"; setOnClickListener { finish() } })
+        }
+        setContentView(android.widget.ScrollView(this).apply { addView(body) })
     }
 
     private fun loadSettings() {
@@ -373,6 +275,7 @@ class SettingsActivity : FragmentActivity() {
         binding.switchVoiceProfile.isChecked = securePrefs.getBoolean(KEY_VOICE_PROFILE_ENABLED, false)
         binding.switchShowErrorDetails.isChecked = securePrefs.getBoolean(KEY_SHOW_ERROR_DETAILS, false)
         binding.switchNoisyEnv.isChecked = securePrefs.getBoolean(KEY_NOISY_ENV_MODE, false)
+        binding.switchVoiceInterrupt.isChecked = com.example.voicebrainlive.voice.VoiceInteractionPreferences.interruptionEnabled(this)
         binding.switchTestCallMode.isChecked = securePrefs.getBoolean(KEY_TEST_CALL_MODE, false)
 
         val idleSpinner = binding.spinnerIdleTimeout
@@ -557,6 +460,9 @@ class SettingsActivity : FragmentActivity() {
         binding.btnClearMemory.setOnClickListener {
             showResetMemoryConfirmationDialog()
         }
+        binding.btnConfirmedMemories.setOnClickListener {
+            startActivity(Intent(this, com.example.voicebrainlive.memory.confirmed.ConfirmedMemoryActivity::class.java))
+        }
         binding.btnManageMemory.setOnClickListener {
             startActivity(Intent(this, com.example.voicebrainlive.ui.MemoryManagerActivity::class.java))
         }
@@ -604,6 +510,12 @@ class SettingsActivity : FragmentActivity() {
             securePrefs.edit().putBoolean(KEY_NOISY_ENV_MODE, isChecked).apply()
             Toast.makeText(this, if (isChecked) "ဆူညံ/တိုးတိုးပြော မုဒ် ဖွင့်ပါပြီ" else "ပုံမှန် မုဒ်", Toast.LENGTH_SHORT).show()
         }
+        binding.switchVoiceInterrupt.setOnCheckedChangeListener { button, isChecked ->
+            if (!com.example.voicebrainlive.voice.VoiceInteractionPreferences.setInterruptionEnabled(this, isChecked)) {
+                button.isChecked = com.example.voicebrainlive.voice.VoiceInteractionPreferences.interruptionEnabled(this)
+                Toast.makeText(this, R.string.voice_interrupt_save_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
         binding.switchTestCallMode.setOnCheckedChangeListener { _, isChecked ->
             securePrefs.edit().putBoolean(KEY_TEST_CALL_MODE, isChecked).apply()
             val msg = if (isChecked) "📞 ဖုန်းခေါ်ဆိုမှု စမ်းသပ်မုဒ်ကို ဖွင့်လိုက်ပါပြီ (တကယ့်ဖုန်းခေါ်မည်မဟုတ်ပါ)"
@@ -615,7 +527,7 @@ class SettingsActivity : FragmentActivity() {
 
         binding.btnSpotifyConnect?.setOnClickListener {
             if (SettingsActivity.getSpotifyAccessToken(this) != null) {
-                SettingsActivity.clearSpotifyTokens(this)
+                if (!SettingsActivity.clearSpotifyTokens(this)) { showSecureStorageUnavailable(); return@setOnClickListener }
                 SpotifyManager.disconnect()
                 binding.tvSpotifyStatus?.text = "Spotify ချိတ်ဆက်ရန် login လုပ်ပါ"
                 binding.btnSpotifyConnect?.text = "Spotify ချိတ်ဆက်မယ်"
@@ -625,7 +537,7 @@ class SettingsActivity : FragmentActivity() {
                 val redirectUri = "voicebrainlive://callback"
                 val scope = "streaming user-modify-playback-state playlist-modify-public playlist-modify-private playlist-read-private playlist-read-collaborative"
                 val (verifier, challenge) = generateSpotifyPkce()
-                setSpotifyPkceVerifier(this, verifier)
+                if (!setSpotifyPkceVerifier(this, verifier)) { showSecureStorageUnavailable(); return@setOnClickListener }
                 val authUrl = "https://accounts.spotify.com/authorize?client_id=$clientId&response_type=code&redirect_uri=${Uri.encode(redirectUri)}&scope=${Uri.encode(scope)}&code_challenge_method=S256&code_challenge=$challenge"
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)))
@@ -666,6 +578,7 @@ class SettingsActivity : FragmentActivity() {
         }
 
         binding.btnTestMessenger.setOnClickListener {
+            if (!isSecureSettingsAvailable(this)) { showSecureStorageUnavailable(); return@setOnClickListener }
             val pageToken = binding.etMessengerToken.text.toString().trim()
             val userToken = binding.etMessengerUserToken.text.toString().trim()
 
@@ -676,11 +589,11 @@ class SettingsActivity : FragmentActivity() {
             }
 
             // Save both tokens before testing
-            securePrefs.edit().apply {
-                putString(MessengerApiClient.PREF_MESSENGER_TOKEN, pageToken)
-                putString(MessengerApiClient.PREF_MESSENGER_USER_TOKEN, userToken)
-                apply()
+            val saved = com.example.voicebrainlive.security.SecureSettingsStorage.write(this) {
+                it.putString(MessengerApiClient.PREF_MESSENGER_TOKEN, pageToken)
+                it.putString(MessengerApiClient.PREF_MESSENGER_USER_TOKEN, userToken)
             }
+            if (!saved) { showSecureStorageUnavailable(); return@setOnClickListener }
 
             binding.tvPageTokenStatus.text = "Page Token: Checking..."
             binding.tvUserTokenStatus.text = "User Token: Checking..."
@@ -793,13 +706,13 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun saveSettings() {
+        if (!isSecureSettingsAvailable(this)) { showSecureStorageUnavailable(); return }
         val geminiKey = binding.etGeminiApiKey.text.toString().trim()
         val notionToken = binding.etNotionToken.text.toString().trim()
         val notionDbId = binding.etNotionDatabaseId.text.toString().trim()
         val messengerToken = binding.etMessengerToken.text.toString().trim()
         val messengerUserToken = binding.etMessengerUserToken.text.toString().trim()
         val theme = if (binding.spinnerTheme.selectedItemPosition == 1) "light" else "dark"
-        ThemeUtils.setTheme(this, theme)
         val voices = listOf("Aoede", "Charon", "Fenrir", "Kore", "Puck", "Zephyr")
         val voice = voices.getOrElse(binding.spinnerVoice.selectedItemPosition) { "Aoede" }
         val modelValues = listOf(
@@ -825,7 +738,7 @@ class SettingsActivity : FragmentActivity() {
         val notifTimeoutValues = listOf(5, 10, 15, 30, 0)
         val notifTimeout = notifTimeoutValues.getOrElse(binding.spinnerNotificationAutoTimeout.selectedItemPosition) { 10 }
 
-        securePrefs.edit().apply {
+        val saved = com.example.voicebrainlive.security.SecureSettingsStorage.write(this) { editor -> with(editor) {
             putString(KEY_GEMINI_API, geminiKey)
             putString(KEY_NOTION_TOKEN, notionToken)
             putString(KEY_NOTION_DATABASE_ID, notionDbId)
@@ -843,8 +756,10 @@ class SettingsActivity : FragmentActivity() {
             putInt(KEY_REMINDER_REPEAT_MINUTES, reminderRepeat)
             putInt(KEY_NOTIFICATION_AUTO_TIMEOUT_SECONDS, notifTimeout)
             putBoolean(KEY_TEST_CALL_MODE, binding.switchTestCallMode.isChecked)
-            apply()
-        }
+        } }
+
+        if (!saved) { showSecureStorageUnavailable(); return }
+        ThemeUtils.setTheme(this, theme)
 
         Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
         finish()
@@ -1103,6 +1018,7 @@ class SettingsActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (!settingsStorageReady || !::binding.isInitialized) return
         // Refresh notification access status whenever we come back from settings
         updateNotificationAccessStatus()
         binding.switchBubble.isChecked = BubblePrefs.isEnabled(this)
@@ -1111,8 +1027,8 @@ class SettingsActivity : FragmentActivity() {
 
     private fun showResetMemoryConfirmationDialog() {
         android.app.AlertDialog.Builder(this)
-            .setTitle("မှတ်ဉာဏ်အားလုံး ဖျက်ရန်")
-            .setMessage("မှတ်ဉာဏ်များ၊ စကားပြောမှတ်တမ်းများနှင့် အလေ့အထများ အားလုံးကို ဖျက်ဆီးပြီး အသစ်ကပြန်စမှာ သေချာပါသလား?")
+            .setTitle("မူရင်း Memory နှင့် မှတ်တမ်းများ ရှင်းရန်")
+            .setMessage("မူရင်း Memory၊ notes၊ စကားပြောမှတ်တမ်းများနှင့် အလေ့အထများကို ရှင်းမှာ သေချာပါသလား? Confirmed memories သီးခြားစာရင်းကို ဒီ Reset က မဖျက်ပါ။ ထိုစာရင်းတွင် တစ်ခုချင်း preview ကြည့်ပြီး ဖျက်နိုင်ပါသည်။")
             .setPositiveButton("သေချာပါတယ် (Reset)") { dialog, _ ->
                 dialog.dismiss()
                 performMemoryReset()

@@ -72,7 +72,7 @@ class SpotifyAuthCallbackActivity : AppCompatActivity() {
             Log.e("SpotifyAuth", "No PKCE verifier - was auth started from this app?")
             return false
         }
-        SettingsActivity.clearSpotifyPkceVerifier(this)
+        if (!SettingsActivity.clearSpotifyPkceVerifier(this)) return false
         val clientId = BuildConfig.SPOTIFY_CLIENT_ID
         val redirectUri = BuildConfig.SPOTIFY_REDIRECT_URI
         val body = FormBody.Builder()
@@ -97,7 +97,6 @@ class SpotifyAuthCallbackActivity : AppCompatActivity() {
             val accessToken = json.optString("access_token").takeIf { it.isNotBlank() } ?: return false
             val refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() }
             SettingsActivity.saveSpotifyTokens(this, accessToken, refreshToken)
-            true
         } catch (e: Exception) {
             Log.e("SpotifyAuth", "Token exchange: ${e.message}", e)
             false

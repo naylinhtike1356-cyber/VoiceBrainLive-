@@ -32,6 +32,10 @@ class ChatSessionFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.btnConnectedAgent.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(),com.example.voicebrainlive.agent.connected.ConnectedAgentActivity::class.java)
+                .setPackage(requireContext().packageName))
+        }
         if (savedInstanceState == null) {
             chatFragment = ChatFragment.newInstance(sessionId = viewModel.getChatSessionId())
             childFragmentManager.beginTransaction()

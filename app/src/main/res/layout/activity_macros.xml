@@ -7,7 +7,7 @@
     android:background="@drawable/bg_gradient">
 
     <!-- Header -->
-    <LinearLayout
+    <LinearLayout android:id="@+id/macroHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -127,7 +127,7 @@
     <TextView
         android:id="@+id/tvEmpty"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center"
         android:padding="32dp"
         android:text="မက်ခရိုများ မရှိသေးပါ။\nဥပမာ- 'create_macro' ဟုခေါ်ပြီး အသံဖြင့် ဆောက်နိုင်ပါသည်။"

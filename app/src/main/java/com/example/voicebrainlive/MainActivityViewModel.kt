@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.voicebrainlive.audio.AudioFocusHelper
 import com.example.voicebrainlive.audio.AudioPlayerHelper
 import com.example.voicebrainlive.audio.AudioRecorderHelper
+import com.example.voicebrainlive.audio.PlaybackDrainLease
 import com.example.voicebrainlive.commands.PhoneCommandExecutor
 import com.example.voicebrainlive.gemini.GeminiLiveClient
 import com.example.voicebrainlive.learning.LearnedIntentExecutor
@@ -90,6 +91,9 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         private set
 
     var isFirstAudioChunkOfTurn = true
+    private var focusUnavailableForTurn = false
+    private val playbackDrainLease = PlaybackDrainLease()
+    private var playbackDrainJob: Job? = null
     private var setupTimeoutJob: Job? = null
     private var memoryRefreshJob: Job? = null
     private var voiceFastPathJob: Job? = null
@@ -314,7 +318,12 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         audioRecorder = AudioRecorderHelper().apply {
             useVoiceCommunicationForNoisyEnv = SettingsActivity.isNoisyEnvMode(app)
         }
-        audioPlayer = AudioPlayerHelper()
+        audioPlayer = AudioPlayerHelper().apply {
+            onError = { message ->
+                _statusMessage.value = message
+                _uiState.update { AssistantState.Error(message) }
+            }
+        }
         geminiNano = GeminiNanoHelper(app)
 
         setupInternalCallbacks()
@@ -365,6 +374,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun disconnect() {
+        cancelPlaybackDrain()
         if (::phoneExecutor.isInitialized) phoneExecutor.invalidateApprovals()
         if (isClientInitialized) {
             setupTimeoutJob?.cancel()
@@ -424,6 +434,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         }
         
         gc.onDisconnected = {
+            cancelPlaybackDrain()
             if (::phoneExecutor.isInitialized) phoneExecutor.invalidateApprovals()
             Log.d("VM_DEBUG", ">>> onDisconnected!")
             // SAVE ON DISCONNECT - backup save
@@ -443,6 +454,8 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         }
         
         gc.onReconnecting = { attempt, delayMs ->
+            cancelPlaybackDrain()
+            audioPlayer.stop()
             if (::phoneExecutor.isInitialized) phoneExecutor.invalidateApprovals()
             Log.d("VM_DEBUG", ">>> onReconnecting! attempt=$attempt")
             _statusMessage.value = "Reconnecting... ($attempt/5)"
@@ -451,7 +464,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
         gc.onError = { message ->
             setupTimeoutJob?.cancel()
-            Log.e("MainActivityVM", "Gemini Error: $message")
+            Log.e("MainActivityVM", "Voice provider error received")
             _statusMessage.value = if (message == GeminiLiveClient.ERROR_API_KEY_REQUIRED) {
                 app.getString(R.string.please_add_api_key)
             } else {
@@ -501,6 +514,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         }
         
         gc.onInterrupted = {
+            cancelPlaybackDrain()
             Log.d("VM_DEBUG", ">>> onInterrupted!")
             if (currentAiResponse.isNotBlank()) {
                 VoiceHistory.add(app, currentUserInput, currentAiResponse.trim() + " (Interrupted)")
@@ -509,14 +523,19 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
                 currentUserInput = "🎤"
             }
             audioPlayer.clearQueue()
-            AudioFocusHelper.abandon(app)
+            AudioFocusHelper.abandon(app, audioPlayer)
             isFirstAudioChunkOfTurn = true
             _statusMessage.value = "Listening..."
             _uiState.update { AssistantState.Listening }
         }
 
         audioRecorder.onAudioChunk = { base64 ->
-            if (gc.isConnected() && _uiState.value != AssistantState.Speaking && !audioPlayer.isActuallySpeaking() && listener?.isTtsSpeaking() != true) {
+            val active = audioRecorder.isRecording() && geminiClient === gc && gc.isConnected() &&
+                _uiState.value in listOf(AssistantState.Listening, AssistantState.Processing, AssistantState.Speaking)
+            if (com.example.voicebrainlive.voice.VoiceInputPolicy.mayForward(
+                    active, false, _uiState.value == AssistantState.Speaking || audioPlayer.isActuallySpeaking(),
+                    listener?.isTtsSpeaking() == true,
+                    com.example.voicebrainlive.voice.VoiceInteractionPreferences.interruptionEnabled(app))) {
                 gc.sendAudioChunk(base64)
             }
         }
@@ -577,6 +596,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
     fun stopListening() {
         if (_uiState.value != AssistantState.Listening && _uiState.value != AssistantState.Speaking) return
+        cancelPlaybackDrain()
         
         try {
             audioRecorder.stop()
@@ -602,46 +622,78 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
 
     fun playAudioChunk(base64: String) {
+        // This is called directly by the current provider callback, before UI/decoding.
+        val player = audioPlayer
+        val producer = if (!FocusMode.isActive(app)) player.captureStartedProducer() else null
+        if (producer == null) return
         if (!FocusMode.isActive(app)) {
-            _uiState.update { AssistantState.Speaking }
-            if (isFirstAudioChunkOfTurn) {
-                AudioFocusHelper.requestForSpeech(app)
-                isFirstAudioChunkOfTurn = false
-            }
-            if (!audioPlayer.isPlaying()) {
-                audioPlayer.start()
-            }
-            try { audioPlayer.playBase64(base64) } catch (e: Exception) { Log.e("MainActivityVM", "playBase64", e) }
+            if (!preparePlaybackTurn(player)) return
+            try { player.playBase64(producer, base64) } catch (e: Exception) { Log.e("MainActivityVM", "playBase64", e) }
         }
     }
 
 
     fun playAudioBytes(bytes: ByteArray) {
+        val player = audioPlayer
+        val producer = if (!FocusMode.isActive(app)) player.captureStartedProducer() else null
+        if (producer == null) return
         if (!FocusMode.isActive(app)) {
-            _uiState.update { AssistantState.Speaking }
-            if (isFirstAudioChunkOfTurn) {
-                AudioFocusHelper.requestForSpeech(app)
-                isFirstAudioChunkOfTurn = false
-            }
-            if (!audioPlayer.isPlaying()) {
-                audioPlayer.start()
-            }
-            try { audioPlayer.playRaw(bytes) } catch (e: Exception) { Log.e("MainActivityVM", "playRaw", e) }
+            if (!preparePlaybackTurn(player)) return
+            try { player.playRaw(producer, bytes) } catch (e: Exception) { Log.e("MainActivityVM", "playRaw", e) }
         }
     }
 
 
     fun onTurnCompleteOrInterrupted() {
-        viewModelScope.launch(Dispatchers.IO) {
-            var timeout = 0
-            while (audioPlayer.isActuallySpeaking() && timeout < 25000) {
-                kotlinx.coroutines.delay(100)
-                timeout += 100
+        val player = audioPlayer
+        playbackDrainLease.replace { token ->
+            playbackDrainJob?.cancel()
+            playbackDrainJob = viewModelScope.launch(Dispatchers.IO) {
+                var timeout = 0
+                while (player.isActuallySpeaking() && timeout < 25000) {
+                    kotlinx.coroutines.delay(100)
+                    timeout += 100
+                }
+                // Approximate native drain allowance, not measured audible completion.
+                kotlinx.coroutines.delay(300)
+                playbackDrainLease.withCurrent(token) {
+                    AudioFocusHelper.abandon(app, player)
+                    isFirstAudioChunkOfTurn = true
+                    focusUnavailableForTurn = false
+                    _uiState.update { AssistantState.Listening }
+                }
             }
-            kotlinx.coroutines.delay(300)
-            AudioFocusHelper.abandon(app)
+        }
+    }
+
+    private fun preparePlaybackTurn(player: AudioPlayerHelper): Boolean {
+        var allowed = false
+        playbackDrainLease.replace {
+            playbackDrainJob?.cancel()
+            playbackDrainJob = null
+            if (focusUnavailableForTurn) return@replace
+            if (isFirstAudioChunkOfTurn) {
+                if (!AudioFocusHelper.requestForSpeech(app, player)) {
+                    focusUnavailableForTurn = true
+                    player.onError?.invoke("Audio focus unavailable; text response remains available.")
+                    return@replace
+                }
+                isFirstAudioChunkOfTurn = false
+            }
+            _uiState.update { AssistantState.Speaking }
+            allowed = true
+        }
+        return allowed
+    }
+
+    private fun cancelPlaybackDrain() {
+        val player = if (::audioPlayer.isInitialized) audioPlayer else null
+        playbackDrainLease.revoke {
+            playbackDrainJob?.cancel()
+            playbackDrainJob = null
+            if (player != null) AudioFocusHelper.abandon(app, player)
             isFirstAudioChunkOfTurn = true
-            _uiState.update { AssistantState.Listening }
+            focusUnavailableForTurn = false
         }
     }
 
@@ -665,6 +717,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
 
     fun clearCallbacks() {
+        cancelPlaybackDrain()
         listener = null
         // First-run navigation can destroy the activity before audio initialization.
         if (::audioRecorder.isInitialized) {
@@ -675,6 +728,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
 
     override fun onCleared() {
+        cancelPlaybackDrain()
         if (::phoneExecutor.isInitialized) phoneExecutor.invalidateApprovals()
         super.onCleared()
         clearCallbacks()

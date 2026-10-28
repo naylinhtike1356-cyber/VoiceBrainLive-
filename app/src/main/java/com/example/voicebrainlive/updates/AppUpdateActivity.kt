@@ -1,23 +1,19 @@
 package com.example.voicebrainlive.updates
 
 import android.content.Intent
-import android.content.pm.PackageInfo
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.example.voicebrainlive.BuildConfig
 import com.example.voicebrainlive.ThemeUtils
 import com.example.voicebrainlive.databinding.ActivityAppUpdateBinding
-import kotlinx.coroutines.CancellationException
+import com.example.voicebrainlive.security.SecureSettingsStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,20 +21,12 @@ import java.io.File
 
 class AppUpdateActivity : FragmentActivity() {
     private lateinit var binding: ActivityAppUpdateBinding
-    private var available: AvailableUpdate? = null
-    private var verifiedApk: File? = null
-    private var checkedToken: String? = null
-    private val prefs by lazy {
-        runCatching {
-            val key = MasterKey.Builder(this).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-            EncryptedSharedPreferences.create(this, "github_updates_secure", key,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
-        }.getOrNull()
-    }
-    private val installPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (packageManager.canRequestPackageInstalls()) installApk()
-        else binding.tvUpdateStatus.text = "Installation permission was not granted."
+    private var currentProvider: ReleaseProvider = UnconfiguredReleaseProvider
+    private var pendingInstallApk: File? = null
+
+    companion object {
+        private const val PREF_GITHUB_TOKEN = "github_update_token"
+        private const val REQUEST_CODE_INSTALL_PERMISSION = 1001
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,120 +34,184 @@ class AppUpdateActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityAppUpdateBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.btnBack.setOnClickListener { finish() }
-        binding.tvInstalledVersion.text = "Installed: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-        binding.etGithubToken.setText(prefs?.getString(TOKEN_KEY, ""))
-        binding.btnReleasePage.setOnClickListener {
+
+        binding.btnBack.setOnClickListener { finish() }
+
+        binding.tvInstalledVersion.text = "Version: ${BuildConfig.VERSION_NAME}\nBuild: ${BuildConfig.VERSION_CODE}\nBuild type: ${BuildConfig.BUILD_TYPE}"
+        binding.tvDistributionChannel.text = when {
+            BuildConfig.BUILD_TYPE == "agentPilot" -> "Distribution: private agent pilot; not a published release"
+            BuildConfig.DEBUG -> "Distribution: test / debug build"
+            else -> "Distribution: release build; publication channel unverified"
+        }
+
+        loadSavedToken()
+        setupTokenActions()
+
+        // Initialize status
+        showStatus(UpdateStatus.NotConfigured)
+
+        binding.btnCheckUpdate.setOnClickListener {
+            performUpdateCheck()
+        }
+
+        binding.btnDownloadInstall.setOnClickListener {
+            performDownloadAndInstall()
+        }
+    }
+
+    private fun loadSavedToken() {
+        val savedToken = SecureSettingsStorage.read(this, "") { it.getString(PREF_GITHUB_TOKEN, "") ?: "" }
+        if (savedToken.isNotBlank()) {
+            binding.etGitHubToken.setText(savedToken)
+        }
+    }
+
+    private fun setupTokenActions() {
+        binding.btnSaveToken.setOnClickListener {
+            val token = binding.etGitHubToken.text.toString().trim()
+            SecureSettingsStorage.write(this) { it.putString(PREF_GITHUB_TOKEN, token) }
+            Toast.makeText(this, "GitHub Token ကို လုံခြုံစွာ သိမ်းဆည်းပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.btnClearToken.setOnClickListener {
+            binding.etGitHubToken.setText("")
+            SecureSettingsStorage.write(this) { it.remove(PREF_GITHUB_TOKEN) }
+            Toast.makeText(this, "GitHub Token ကို ဖျက်ပစ်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun getActiveProvider(): ReleaseProvider {
+        val savedToken = SecureSettingsStorage.read(this, "") { it.getString(PREF_GITHUB_TOKEN, "") ?: "" }
+        val repo = BuildConfig.UPDATE_REPOSITORY
+        return if (savedToken.isNotBlank()) {
+            GitHubReleaseProvider(savedToken, repo)
+        } else {
+            UnconfiguredReleaseProvider
+        }
+    }
+
+    private fun performUpdateCheck() {
+        binding.btnCheckUpdate.isEnabled = false
+        binding.progressUpdate.visibility = View.VISIBLE
+        binding.layoutNewUpdate.visibility = View.GONE
+
+        lifecycleScope.launch {
             try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/${BuildConfig.UPDATE_REPOSITORY}/releases/latest")))
-            } catch (_: android.content.ActivityNotFoundException) {
-                binding.tvUpdateStatus.text = "No browser is available."
+                currentProvider = getActiveProvider()
+                val checker = UpdateChecker(packageName, BuildConfig.VERSION_CODE.toLong(), currentProvider)
+                val status = checker.check()
+                showStatus(status)
+            } finally {
+                binding.progressUpdate.visibility = View.GONE
+                binding.btnCheckUpdate.isEnabled = true
             }
         }
-        binding.btnCheckUpdate.setOnClickListener { checkUpdate() }
-        binding.btnInstallUpdate.setOnClickListener { downloadUpdate() }
     }
 
-    private fun busy(value: Boolean) {
-        binding.progressUpdate.visibility = if (value) View.VISIBLE else View.GONE
-        binding.btnCheckUpdate.isEnabled = !value
-        binding.etGithubToken.isEnabled = !value
-        binding.btnInstallUpdate.isEnabled = !value && available != null
+    private fun showStatus(status: UpdateStatus) {
+        binding.tvReleaseNotes.text = ""
+        binding.tvReleaseNotes.visibility = View.GONE
+        binding.layoutNewUpdate.visibility = View.GONE
+
+        binding.tvUpdateStatus.text = when (status) {
+            UpdateStatus.NotConfigured -> "No trusted update source configured. Live updates are NOT CONFIGURED."
+            UpdateStatus.Current -> "သင့်အက်ပ်သည် နောက်ဆုံးဗားရှင်း ဖြစ်ပါသည် (No newer version is available)."
+            UpdateStatus.Failed -> "အပ်ဒိတ် စစ်ဆေး၍မရပါ (Could not check for updates). Token သို့မဟုတ် ကွန်ရက်ကို စစ်ဆေးပါ။"
+            is UpdateStatus.Available -> {
+                val rel = status.release
+                binding.layoutNewUpdate.visibility = View.VISIBLE
+                binding.tvNewVersionInfo.text = "ဗားရှင်း: ${rel.versionName} (Build ${rel.versionCode})\nအရွယ်အစား: %.1f MB".format(rel.size / (1024.0 * 1024.0))
+
+                if (rel.releaseNotes.isNotBlank()) {
+                    binding.tvReleaseNotes.text = rel.releaseNotes
+                    binding.tvReleaseNotes.visibility = View.VISIBLE
+                }
+
+                "Version ${rel.versionName} (${rel.versionCode}) is available. Downloads are ready."
+            }
+        }
     }
 
-    private fun checkUpdate() {
-        val token = binding.etGithubToken.text.toString().trim()
-        available = null
-        verifiedApk = null
-        checkedToken = null
-        binding.btnInstallUpdate.visibility = View.GONE
-        if (token.isBlank()) {
-            prefs?.edit()?.remove(TOKEN_KEY)?.apply()
-            binding.tvUpdateStatus.text = "Enter a GitHub token with Contents read access, or open the release page and sign in."
+    private fun performDownloadAndInstall() {
+        val gitHubProvider = currentProvider as? GitHubReleaseProvider
+        val availableUpdate = gitHubProvider?.lastAvailableUpdate
+
+        if (availableUpdate == null) {
+            Toast.makeText(this, "ဒေါင်းလုဒ်ဆွဲရန် အချက်အလက် မပြည့်စုံပါ", Toast.LENGTH_SHORT).show()
             return
         }
-        prefs?.edit()?.putString(TOKEN_KEY, token)?.apply()
-        busy(true)
-        binding.tvUpdateStatus.text = "Checking for updates..."
+
+        binding.btnDownloadInstall.isEnabled = false
+        binding.layoutDownloadProgress.visibility = View.VISIBLE
+        binding.progressDownload.progress = 0
+        binding.tvDownloadProgress.text = "ဒေါင်းလုဒ် စတင်နေပါသည်..."
+
         lifecycleScope.launch {
             try {
-                val update = withContext(Dispatchers.IO) { GitHubUpdates(token).latest(packageName) }
-                if (update.manifest.isNewerThan(BuildConfig.VERSION_CODE.toLong())) {
-                    available = update
-                    checkedToken = token
-                    binding.tvUpdateStatus.text = "Version ${update.manifest.versionName} is available."
-                    binding.btnInstallUpdate.visibility = View.VISIBLE
-                } else {
-                    binding.tvUpdateStatus.text = "You have the latest version (${BuildConfig.VERSION_NAME})."
+                val updatesDir = File(cacheDir, "updates").apply { mkdirs() }
+                val targetApk = File(updatesDir, "VoiceBrainLive-${availableUpdate.manifest.versionName}.apk")
+
+                withContext(Dispatchers.IO) {
+                    gitHubProvider.gitHubUpdates.download(availableUpdate, targetApk) { downloaded, total ->
+                        val percent = if (total > 0) ((downloaded * 100) / total).toInt() else 0
+                        runOnUiThread {
+                            binding.progressDownload.progress = percent
+                            binding.tvDownloadProgress.text = "ဒေါင်းလုဒ်ဆွဲနေသည်... %.1f MB / %.1f MB (%d%%)".format(
+                                downloaded / (1024.0 * 1024.0),
+                                total / (1024.0 * 1024.0),
+                                percent
+                            )
+                        }
+                    }
                 }
-            } catch (e: CancellationException) {
-                throw e
+
+                binding.tvDownloadProgress.text = "ဒေါင်းလုဒ် ပြီးစီးပါပြီ။ တပ်ဆင်ရန် ပြင်ဆင်နေပါသည်..."
+                promptInstall(targetApk)
             } catch (e: Exception) {
-                binding.tvUpdateStatus.text = e.message ?: "Could not check for updates."
+                binding.tvDownloadProgress.text = "ဒေါင်းလုဒ် မအောင်မြင်ပါ: ${e.message}"
+                Toast.makeText(this@AppUpdateActivity, "ဒေါင်းလုဒ် မအောင်မြင်ပါ: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
-                busy(false)
+                binding.btnDownloadInstall.isEnabled = true
             }
         }
     }
 
-    private fun downloadUpdate() {
-        val update = available ?: return
-        val token = checkedToken ?: return
-        busy(true)
-        binding.tvUpdateStatus.text = "Downloading and verifying version ${update.manifest.versionName}..."
-        lifecycleScope.launch {
-            try {
-                val apk = withContext(Dispatchers.IO) {
-                    GitHubUpdates(token).download(update, File(cacheDir, "VoiceBrainLive-update.apk"))
-                        .also { verifyApk(it, update.manifest) }
-                }
-                verifiedApk = apk
-                binding.tvUpdateStatus.text = "Update verified. Confirm installation in Android."
-                if (packageManager.canRequestPackageInstalls()) installApk()
-                else installPermission.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                verifiedApk = null
-                binding.tvUpdateStatus.text = e.message ?: "Could not install the update."
-            } finally {
-                busy(false)
+    private fun promptInstall(apkFile: File) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            pendingInstallApk = apkFile
+            Toast.makeText(this, "အက်ပ် Update တင်နိုင်ရန် 'Allow from this source' ခွင့်ပြုပေးပါ", Toast.LENGTH_LONG).show()
+            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                data = Uri.parse("package:$packageName")
             }
+            startActivityForResult(intent, REQUEST_CODE_INSTALL_PERMISSION)
+        } else {
+            launchPackageInstaller(apkFile)
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun verifyApk(file: File, manifest: ReleaseManifest) {
+    private fun launchPackageInstaller(apkFile: File) {
         try {
-            val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
-            val archive = packageManager.getPackageArchiveInfo(file.path, flags) ?: error("APK is not valid")
-            require(archive.packageName == packageName) { "APK belongs to a different app" }
-            val version = if (Build.VERSION.SDK_INT >= 28) archive.longVersionCode else archive.versionCode.toLong()
-            require(version == manifest.versionCode && version > BuildConfig.VERSION_CODE) { "APK version does not match the update" }
-            val installed = packageManager.getPackageInfo(packageName, flags)
-            fun signers(info: PackageInfo): Set<String> = (if (Build.VERSION.SDK_INT >= 28)
-                info.signingInfo?.apkContentsSigners else info.signatures)
-                ?.map { it.toCharsString() }?.toSet().orEmpty()
-            require(signers(installed).isNotEmpty() && signers(installed) == signers(archive)) {
-                "This APK uses a different signing key. It cannot update this installation."
+            val apkUri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", apkFile)
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
             }
+            startActivity(installIntent)
         } catch (e: Exception) {
-            file.delete()
-            throw e
+            Toast.makeText(this, "တပ်ဆင်မှု မစတင်နိုင်ပါ: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun installApk() {
-        val apk = verifiedApk ?: return
-        try {
-            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
-            startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-        } catch (_: android.content.ActivityNotFoundException) {
-            binding.tvUpdateStatus.text = "No Android package installer is available."
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_INSTALL_PERMISSION) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls()) {
+                pendingInstallApk?.let { launchPackageInstaller(it) }
+            } else {
+                Toast.makeText(this, "ခွင့်ပြုချက် မရရှိပါက Update မတင်နိုင်ပါ", Toast.LENGTH_SHORT).show()
+            }
         }
     }
-
-    companion object { private const val TOKEN_KEY = "github_update_token" }
 }
