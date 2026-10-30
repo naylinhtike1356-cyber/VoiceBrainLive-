@@ -14,7 +14,7 @@ object AgentSpeech {
     const val EXTRA_TICKET = "agent_speech_ticket"
     private val handler = Handler(Looper.getMainLooper())
     private data class Request(val id: String, val owner: Any, val done: () -> Unit, val error: (() -> Unit)?)
-    private var pending: Request? = null
+    @Volatile private var pending: Request? = null
     val isSpeaking: Boolean get() = pending != null
 
     fun speak(context: Context, text: String, owner: Any = context,
