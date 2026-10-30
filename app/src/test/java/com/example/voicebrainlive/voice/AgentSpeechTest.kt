@@ -15,6 +15,30 @@ import org.robolectric.shadows.ShadowTextToSpeech
 @Config(sdk = [28], application = Application::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class AgentSpeechTest {
+    @Test fun blockedBackgroundLaunchOffersOpenActionWithoutTtsFallback() {
+        val app = RuntimeEnvironment.getApplication()
+        val owner = Any()
+        var errors = 0
+        var done = 0
+        val blocked = object : android.content.ContextWrapper(app) {
+            override fun startForegroundService(service: android.content.Intent): android.content.ComponentName? {
+                throw SecurityException("Background microphone launch blocked")
+            }
+        }
+        try {
+            assertFalse(AgentSpeech.speak(blocked, "private announcement", owner, { errors++ }, { done++ }))
+            assertEquals(1, errors)
+            assertEquals(1, done)
+            assertFalse(AgentSpeech.isSpeaking)
+            assertNull(ShadowTextToSpeech.getLastTextToSpeechInstance())
+            val manager = app.getSystemService(android.app.NotificationManager::class.java)
+            val notice = Shadows.shadowOf(manager).getNotification(94640)
+            assertNotNull(notice)
+            assertFalse(notice.extras.toString().contains("private announcement"))
+            val open = Shadows.shadowOf(notice.contentIntent).savedIntent
+            assertEquals(com.example.voicebrainlive.AssistantActivity::class.java.name, open.component!!.className)
+        } finally { AgentSpeech.stop(owner) }
+    }
     @Test fun wakesAgentWithQuotedDataAndNoTtsEngine() {
         val app = RuntimeEnvironment.getApplication()
         val owner = Any()

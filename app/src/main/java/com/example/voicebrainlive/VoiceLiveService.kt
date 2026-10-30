@@ -152,6 +152,7 @@ class VoiceLiveService : Service() {
     private var micRestartAttempts = 0
     private var micRestartJob: Job? = null
     private var isServiceDestroyed = false
+    private var foregroundReady = false
 
     private var waveAnimator: ValueAnimator? = null
     private var cardOrbAnimator1: ValueAnimator? = null
@@ -166,7 +167,16 @@ class VoiceLiveService : Service() {
         Log.d(TAG, "VoiceLiveService onCreate")
         instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        startForegroundServiceNotification()
+        try {
+            startForegroundServiceNotification()
+            foregroundReady = true
+        } catch (_: RuntimeException) {
+            Log.w(TAG, "Android blocked native agent foreground startup")
+            com.example.voicebrainlive.voice.AgentSpeech.showOpenNotification(this)
+            instance = null
+            stopSelf()
+            return
+        }
 
         // Hide persistent idle floating bubble while VoiceLiveService is active
         try {
@@ -192,6 +202,12 @@ class VoiceLiveService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!foregroundReady) {
+            com.example.voicebrainlive.voice.AgentSpeech.complete(
+                intent?.getStringExtra(com.example.voicebrainlive.voice.AgentSpeech.EXTRA_TICKET), false)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         val action = intent?.action
         Log.d(TAG, "onStartCommand action: $action")
         when (action) {
@@ -285,7 +301,7 @@ class VoiceLiveService : Service() {
         try {
             composeLifecycleOwner.onDestroy()
             Log.d(TAG, "VoiceLiveService onDestroy")
-            stopLiveSession()
+            if (foregroundReady) stopLiveSession()
             hideOverlays()
             serviceScope.cancel()
         } catch (e: Exception) {
@@ -294,7 +310,7 @@ class VoiceLiveService : Service() {
             instance = null
 
             // Re-show floating bubble if enabled in settings
-            if (BubblePrefs.isEnabled(this)) {
+            if (foregroundReady && BubblePrefs.isEnabled(this)) {
                 try {
                     val bubbleIntent = Intent(this, FloatingBubbleService::class.java).apply {
                         action = FloatingBubbleService.ACTION_SHOW_BUBBLE

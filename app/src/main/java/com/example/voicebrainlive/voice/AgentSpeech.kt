@@ -46,7 +46,26 @@ object AgentSpeech {
                 }
             }, request.id, android.os.SystemClock.uptimeMillis() + 60_000)
             true
-        } catch (_: Exception) { complete(request.id, false); false }
+        } catch (_: Exception) {
+            complete(request.id, false)
+            showOpenNotification(context.applicationContext)
+            false
+        }
+    }
+
+    fun showOpenNotification(context: Context) {
+        try {
+            val manager = context.getSystemService(android.app.NotificationManager::class.java)
+            val channel = "agent_open_required"
+            manager.createNotificationChannel(android.app.NotificationChannel(channel, "Agent အသိပေးချက်", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+            val open = android.app.PendingIntent.getActivity(context, 0,
+                Intent(context, com.example.voicebrainlive.AssistantActivity::class.java),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+            manager.notify(94640, androidx.core.app.NotificationCompat.Builder(context, channel)
+                .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Agent ကို ဖွင့်ရန် နှိပ်ပါ")
+                .setContentText("Android က နောက်ခံမှ စတင်ခွင့်မပေးပါ။")
+                .setContentIntent(open).setAutoCancel(true).build())
+        } catch (_: RuntimeException) { /* A revoked notification permission must not crash the app. */ }
     }
 
     internal fun prompt(text: String): String =
