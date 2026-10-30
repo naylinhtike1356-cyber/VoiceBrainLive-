@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_interrupt_title">စကားဖြတ်ပြောခြင်း / Interrupt while speaking</string>
+    <string name="voice_interrupt_detail">Allow your voice to interrupt assistant audio during an active voice session. A headset can reduce speaker feedback.</string>
+    <string name="voice_interrupt_save_failed">The interruption setting could not be saved.</string>
+</resources>

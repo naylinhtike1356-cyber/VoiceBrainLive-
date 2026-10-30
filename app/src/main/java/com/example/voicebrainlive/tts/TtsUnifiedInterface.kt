@@ -7,6 +7,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import java.util.Locale
+import com.example.voicebrainlive.voice.AgentSpeech
 
 /**
  * TTS Unified Interface - Centralized Text-to-Speech management
@@ -64,7 +65,8 @@ class TtsUnifiedInterface(
     private var onSpeakingComplete: (() -> Unit)? = null
 
     init {
-        initializeTts()
+        // Legacy interfaces are retained, but speech now wakes the native-audio agent.
+        if (!AgentSpeech.ENABLED) initializeTts()
         activeInstances.add(this)
     }
 
@@ -137,6 +139,7 @@ class TtsUnifiedInterface(
     }
 
     fun speak(text: String) {
+        if (AgentSpeech.ENABLED) { AgentSpeech.speak(appContext, text, this, onDone = { onSpeakingComplete?.invoke() }); return }
         if (!isInitialized) {
             Log.w(TAG, "TTS not initialized, skipping: $text")
             return
@@ -149,6 +152,7 @@ class TtsUnifiedInterface(
      * FIX: No immediate reset after speak
      */
     fun speakWeather(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         
         tts?.setSpeechRate(WEATHER_SPEECH_RATE)
@@ -160,6 +164,7 @@ class TtsUnifiedInterface(
      * Speak calm - serene, slightly relaxed rate and gentle pitch
      */
     fun speakCalm(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         tts?.setSpeechRate(0.9f)
         tts?.setPitch(0.95f)
@@ -168,7 +173,26 @@ class TtsUnifiedInterface(
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "${UTTERANCE_ID}_calm")
     }
 
+    /** Alarm speech must use an installed offline Myanmar voice; no silent network/default-language fallback. */
+    fun speakLocalAlarm(text: String): Boolean {
+        if (AgentSpeech.ENABLED) return AgentSpeech.speak(appContext, text, this)
+        if (!isInitialized) return false
+        val engine = tts ?: return false
+        return try {
+            val local = engine.voices?.firstOrNull {
+                it.locale.language == "my" && !it.isNetworkConnectionRequired
+            } ?: return false
+            if (engine.setVoice(local) != TextToSpeech.SUCCESS) return false
+            engine.setAudioAttributes(android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            engine.setSpeechRate(0.85f); engine.setPitch(0.95f)
+            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "${UTTERANCE_ID}_local_alarm") == TextToSpeech.SUCCESS
+        } catch (_: Exception) { false }
+    }
+
     fun speakStatus(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "${UTTERANCE_ID}_status")
     }
@@ -178,6 +202,7 @@ class TtsUnifiedInterface(
      * FIX: Flag reset needed, onDone will apply it
      */
     fun speakError(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         
         tts?.setPitch(ERROR_PITCH)
@@ -190,6 +215,7 @@ class TtsUnifiedInterface(
      * FIX: Flag reset needed, onDone will apply it
      */
     fun speakAlert(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         
         tts?.setSpeechRate(1.0f)
@@ -202,6 +228,7 @@ class TtsUnifiedInterface(
      * FIX: Flag reset needed, onDone will apply it
      */
     fun speakKorean(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         
         val koreanLocale = Locale("ko", "KR")
@@ -221,6 +248,7 @@ class TtsUnifiedInterface(
      * FIX: Flag reset needed, onDone will apply it
      */
     fun speakEnglish(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         
         tts?.setLanguage(Locale.US)
@@ -229,11 +257,13 @@ class TtsUnifiedInterface(
     }
 
     fun queueSpeak(text: String) {
+        if (AgentSpeech.ENABLED) { speak(text); return }
         if (!isInitialized) return
         tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "${UTTERANCE_ID}_queued")
     }
 
     fun stop() {
+        if (AgentSpeech.ENABLED) AgentSpeech.stop(this)
         tts?.stop()
         // Reset any pending changes if stopped
         needsPitchReset = false
@@ -241,13 +271,14 @@ class TtsUnifiedInterface(
         needsLanguageReset = false
     }
 
-    fun isSpeaking(): Boolean = tts?.isSpeaking ?: false
+    fun isSpeaking(): Boolean = if (AgentSpeech.ENABLED) AgentSpeech.isSpeaking else tts?.isSpeaking ?: false
 
     fun setOnSpeakingComplete(callback: () -> Unit) {
         onSpeakingComplete = callback
     }
 
     fun shutdown() {
+        if (AgentSpeech.ENABLED) AgentSpeech.stop(this)
         activeInstances.remove(this)
         tts?.stop()
         tts?.shutdown()
@@ -255,5 +286,5 @@ class TtsUnifiedInterface(
         Log.d(TAG, "TTS shutdown")
     }
 
-    fun isAvailable(): Boolean = isInitialized
+    fun isAvailable(): Boolean = AgentSpeech.ENABLED || isInitialized
 }

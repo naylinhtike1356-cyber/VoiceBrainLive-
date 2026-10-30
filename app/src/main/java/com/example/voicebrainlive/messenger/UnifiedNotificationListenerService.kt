@@ -31,7 +31,7 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
-        initTts()
+        // Announcements wake the native Gemini agent; no Android TTS engine.
     }
 
     override fun onDestroy() {
@@ -100,7 +100,7 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
         processedKeys[key] = identifier
 
         if (isHealthApp) {
-            Log.d(TAG, "Health notification from $pkg: $title | $messageText")
+            Log.d(TAG, "Health notification received; private content omitted")
             HealthManager.parseAndSaveFromNotification(this, title, messageText)
         }
 
@@ -111,7 +111,7 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
             lastNotifiedSender = cleanSender
             lastNotifiedTime = sbn.postTime
             lastSenderByPackage[pkg] = CachedSender(cleanSender, messageText, sbn.postTime)
-            Log.d(TAG, "Message cached for reply capability from '$cleanSender' ($pkg): ${messageText.take(60)}")
+            Log.d(TAG, "Message cached for exact reply resolution; private content omitted")
             sendNotificationBroadcast(sender, messageText, pkg)
         }
 
@@ -124,12 +124,20 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
             }
 
             lastNotifiedKey = sbn.key
-            Log.d(TAG, "New notification from selected app '$appLabel': $title | ${messageText.take(60)}")
-            if (isMessagingApp) {
-                val cleanSender = stripMessageCount(sender).ifBlank { title.ifBlank { appLabel } }
-                launchAiReplySession(pkg, cleanSender, messageText)
+            Log.d(TAG, "Selected notification received; private content omitted")
+            if (com.example.voicebrainlive.agent.nativeapps.NativeAgentSettings.enabled(this)) {
+                try {
+                    com.example.voicebrainlive.notifications.AgentNotificationAudio.submit(this, sbn.key, pkg, appLabel, title, messageText)
+                } catch (_: Exception) {
+                    com.example.voicebrainlive.agent.nativeapps.NativeAgentSettings.status(this, "STORAGE_UNAVAILABLE")
+                }
             } else {
-                launchGeneralNotificationSession(pkg, appLabel, title, messageText)
+                if (isMessagingApp) {
+                    val cleanSender = stripMessageCount(sender).ifBlank { title.ifBlank { appLabel } }
+                    launchAiReplySession(pkg, cleanSender, messageText)
+                } else {
+                    launchGeneralNotificationSession(pkg, appLabel, title, messageText)
+                }
             }
         }
     }
@@ -255,16 +263,18 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
                 Log.d(TAG, "Launched Pyit Tine Htaung AI Mascot Overlay session for '$appLabel' ($sender)")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start VoiceLiveService overlay, falling back to TTS", e)
-            speakOut(fallbackText)
+            Log.w(TAG, "Android blocked the native agent overlay")
+            showAgentOpenNotification()
         }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
+        sbn?.key?.let { processedKeys.remove(it); com.example.voicebrainlive.notifications.AgentNotificationAudio.removed(it) }
     }
 
     private fun speakOut(text: String) {
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) return
         if (!isTtsReady || tts == null) {
             initTts()
             return
@@ -277,6 +287,21 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
         }
         Log.d(TAG, "TTS speaking: ${text.take(80)}")
+    }
+
+    private fun showAgentOpenNotification() {
+        val manager = getSystemService(android.app.NotificationManager::class.java)
+        val channel = "agent_open_required"
+        manager.createNotificationChannel(android.app.NotificationChannel(channel, "Agent အသိပေးချက်", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+        val open = android.app.PendingIntent.getActivity(this, 0,
+            Intent(this, com.example.voicebrainlive.AssistantActivity::class.java),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+        try {
+            manager.notify(94640, androidx.core.app.NotificationCompat.Builder(this, channel)
+                .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Agent ကို ဖွင့်ရန် နှိပ်ပါ")
+                .setContentText("Android က နောက်ခံမှ စတင်ခွင့်မပေးပါ။")
+                .setContentIntent(open).setAutoCancel(true).build())
+        } catch (_: SecurityException) { /* Notification permission can be revoked. */ }
     }
 
     private fun sendNotificationBroadcast(sender: String, message: String, packageName: String) {
@@ -334,6 +359,12 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
 
         @Volatile
         var instance: UnifiedNotificationListenerService? = null
+
+        internal fun isAnnouncementCurrent(key:String,pkg:String,title:String,text:String):Boolean = try {
+            instance?.activeNotifications.orEmpty().any {
+                it.key==key && it.packageName==pkg && extractSender(it).take(100)==title && extractMessageText(it).take(480)==text
+            }
+        } catch (_:Exception) { false }
 
         @Volatile
         var lastNotifiedKey: String? = null

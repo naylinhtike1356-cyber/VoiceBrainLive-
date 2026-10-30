@@ -9,6 +9,10 @@ import java.util.Locale
 class OneShotTtsSpeaker(private val context: Context) {
 
     fun speak(text: String, utteranceId: String, onError: (() -> Unit)? = null, onDone: () -> Unit) {
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) {
+            com.example.voicebrainlive.voice.AgentSpeech.speak(context, text, this, onError, onDone)
+            return
+        }
         if (text.isBlank()) {
             onDone()
             return

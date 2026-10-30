@@ -42,6 +42,18 @@
                 app:tint="@color/assistant_text_secondary"
                 android:padding="8dp"
                 android:scaleType="centerInside" />
+
+            <ImageButton
+                android:id="@+id/btnAppUpdateTop"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_popup_sync"
+                android:contentDescription="Check for updates"
+                app:tint="@color/assistant_text_secondary"
+                android:padding="8dp"
+                android:scaleType="centerInside" />
                 
             <ImageButton
                 android:id="@+id/btnSettings"

@@ -7,68 +7,89 @@ import android.media.AudioManager
 import android.os.Build
 import android.util.Log
 
-/**
- * AI ပြောချိန်မှာ သီချင်းအသံ လျော့သွားအောင် requestAudioFocus သုံးမယ်
- */
+/** Resource ownership for voice focus only; never an authorization/session capability. */
 object AudioFocusHelper {
-
     private const val TAG = "AudioFocusHelper"
+    private val compatibilityOwner = Any()
+    private val lock = Any()
+    private data class Hold(val owner: Any, val manager: AudioManager,
+        val request: AudioFocusRequest?, val legacyListener: AudioManager.OnAudioFocusChangeListener?, val ticket:Any)
+    private var held: Hold? = null
 
-    private var currentFocusRequest: AudioFocusRequest? = null
+    /** Only an immediate GRANTED result permits playback; delayed focus is not supported. */
+    fun requestForSpeech(context: Context, owner: Any = compatibilityOwner): Boolean = requestForSpeechWithLoss(context,owner) {}
 
-    /**
-     * AI speech စပြောချိန် ခေါ်ပါ – သီချင်းက duck သွားမယ်
-     */
-    fun requestForSpeech(context: Context): Boolean {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val attrs = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                    .setAudioAttributes(attrs)
-                    .setAcceptsDelayedFocusGain(true)
-                    .build()
-                currentFocusRequest = request
-                val result = am.requestAudioFocus(request)
-                Log.d(TAG, "requestForSpeech: result=$result")
-                result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-            } else {
-                @Suppress("DEPRECATION")
-                val result = am.requestAudioFocus(
-                    null,
-                    AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-                )
-                Log.d(TAG, "requestForSpeech (legacy): result=$result")
-                result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    /** Optional loss callback is generation-bound; legacy two-argument callers retain their API. */
+    fun requestForSpeechWithLoss(context:Context,owner:Any,onLoss:()->Unit):Boolean = synchronized(lock) {
+        try {
+            val manager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return@synchronized false
+            // Release the exact previous request before replacing its resource owner.
+            if (!releaseHeld()) return@synchronized false
+            val ticket=Any()
+            val listener=AudioManager.OnAudioFocusChangeListener { change ->
+                if(change<0&&synchronized(lock){held?.ticket===ticket})onLoss()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "requestForSpeech: ${e.message}")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                    .setOnAudioFocusChangeListener(listener)
+                    .setAcceptsDelayedFocusGain(false).build()
+                val result = manager.requestAudioFocus(request)
+                if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    held = Hold(owner, manager, request, null,ticket)
+                    true
+                } else {
+                    if (result == AudioManager.AUDIOFOCUS_REQUEST_DELAYED) manager.abandonAudioFocusRequest(request)
+                    Log.w(TAG, "FOCUS_NOT_GRANTED")
+                    false
+                }
+            } else {
+                // Loss routing is separate device work for legacy callers; opt-in owners supply onLoss.
+                @Suppress("DEPRECATION")
+                val result = manager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    held = Hold(owner, manager, null, listener,ticket)
+                    true
+                } else {
+                    Log.w(TAG, "FOCUS_NOT_GRANTED")
+                    false
+                }
+            }
+        } catch (_: Exception) {
+            Log.w(TAG, "FOCUS_REQUEST_FAILED")
             false
         }
     }
 
-    /**
-     * AI ပြောပြီးသွားချိန် ခေါ်ပါ – သီချင်းပြန် ပြန်မြှင့်မယ်
-     */
-    fun abandon(context: Context) {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                currentFocusRequest?.let {
-                    am.abandonAudioFocusRequest(it)
-                    currentFocusRequest = null
-                }
+    /** A delayed/stale owner cannot abandon another player's exact focus request. */
+    @Suppress("UNUSED_PARAMETER")
+    fun abandon(context: Context, owner: Any = compatibilityOwner) = synchronized(lock) {
+        if (held?.owner === owner) releaseHeld()
+        Unit
+    }
+
+    private fun releaseHeld(): Boolean {
+        val current = held ?: return true
+        return try {
+            val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && current.request != null) {
+                current.manager.abandonAudioFocusRequest(current.request)
             } else {
                 @Suppress("DEPRECATION")
-                am.abandonAudioFocus(null)
+                current.manager.abandonAudioFocus(current.legacyListener)
             }
-            Log.d(TAG, "abandon: done")
-        } catch (e: Exception) {
-            Log.e(TAG, "abandon: ${e.message}")
+            if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                held = null
+                true
+            } else {
+                Log.w(TAG, "FOCUS_RELEASE_FAILED")
+                false
+            }
+        } catch (_: Exception) {
+            Log.w(TAG, "FOCUS_RELEASE_FAILED")
+            false
         }
     }
 }

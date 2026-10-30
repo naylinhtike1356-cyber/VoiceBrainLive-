@@ -231,6 +231,10 @@ class VoiceBrainExtensions(private val context: Context) {
     // ===== HELPER FUNCTIONS =====
     
     private fun speakText(text: String) {
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) {
+            com.example.voicebrainlive.voice.AgentSpeech.speak(context, text, this)
+            return
+        }
         try {
             // Track translation speaking duration in TtsUnifiedInterface so silence timeout does not close mid-speech
             com.example.voicebrainlive.tts.TtsUnifiedInterface.externalTtsSpeakingUntil = 

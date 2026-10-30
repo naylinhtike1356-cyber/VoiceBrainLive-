@@ -13,7 +13,9 @@ import com.example.voicebrainlive.location.GeofenceHelper
 import com.example.voicebrainlive.location.LocationTriggerStorage
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.tasks.Tasks
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
@@ -112,7 +114,18 @@ class LocationHandler(private val context: Context) : CommandHandler {
 
     private suspend fun fetchLastLocation() = withContext(Dispatchers.IO) {
         try {
-            Tasks.await(fusedLocationClient.lastLocation)
+            kotlin.coroutines.coroutineContext.ensureActive()
+            // Preserve the existing fine-location policy and recheck at the API boundary.
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) return@withContext null
+            val location = Tasks.await(fusedLocationClient.lastLocation)
+            kotlin.coroutines.coroutineContext.ensureActive()
+            location
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Location permission unavailable")
+            null
         } catch (e: Exception) {
             Log.w(TAG, "fetchLastLocation", e)
             null

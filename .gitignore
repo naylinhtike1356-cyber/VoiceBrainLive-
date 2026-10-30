@@ -15,6 +15,7 @@
 .cxx
 local.properties
 .codex/
+.publication/
 *.hprof
 .release-signing/
 *.jks

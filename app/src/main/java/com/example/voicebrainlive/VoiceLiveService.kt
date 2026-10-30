@@ -126,10 +126,23 @@ class VoiceLiveService : Service() {
     private var hasUserSpokenInNotificationSession = false
 
     private var isFirstAudioChunkOfTurn = true
+    private var focusUnavailableForTurn = false
+    private val playbackFocusLock = Any()
     private var currentUserInput = "🎤"
     private var currentAiResponse = ""
     private val currentSessionId = "assistant_${System.currentTimeMillis()}"
     private var pendingProactiveMessage: String? = null
+    private var agentSpeechTicket: String? = null
+    @Volatile private var cancelledAgentSpeech = false
+    @Volatile private var agentSpeechHadAudio = false
+
+    fun cancelAgentSpeech(ticket: String) {
+        if (agentSpeechTicket != ticket) return
+        agentSpeechTicket = null
+        pendingProactiveMessage = null
+        cancelledAgentSpeech = true
+        audioPlayer?.clearQueue()
+    }
     
     // For early audio capture to eliminate latency when clicking the bubble
         private var isGeminiSetupComplete = false
@@ -183,6 +196,11 @@ class VoiceLiveService : Service() {
         Log.d(TAG, "onStartCommand action: $action")
         when (action) {
             ACTION_START -> {
+                val nextSpeechTicket = intent.getStringExtra(com.example.voicebrainlive.voice.AgentSpeech.EXTRA_TICKET)
+                if (agentSpeechTicket != nextSpeechTicket) com.example.voicebrainlive.voice.AgentSpeech.complete(agentSpeechTicket, false)
+                agentSpeechTicket = nextSpeechTicket
+                cancelledAgentSpeech = false
+                agentSpeechHadAudio = false
                 var proactiveMsg: String? = null
                 val startWithCard = intent.getBooleanExtra("EXTRA_START_WITH_CARD", false)
                 if (intent.hasExtra("EXTRA_POWER_BUTTON")) {
@@ -198,7 +216,8 @@ class VoiceLiveService : Service() {
                         currentProactiveType = type
                         isNotificationSession = !type.isNullOrBlank() && (
                             type == com.example.voicebrainlive.messenger.UnifiedNotificationListenerService.PROACTIVE_TYPE_MESSENGER_REPLY ||
-                            type == com.example.voicebrainlive.messenger.UnifiedNotificationListenerService.PROACTIVE_TYPE_GENERAL_NOTIFICATION
+                            type == com.example.voicebrainlive.messenger.UnifiedNotificationListenerService.PROACTIVE_TYPE_GENERAL_NOTIFICATION ||
+                            type == "native_announcement"
                         )
                         isNotificationReplyExecuted = false
                         notificationReplyAuthorized = false
@@ -225,13 +244,14 @@ class VoiceLiveService : Service() {
                         cancelSilenceTimeout()
                         cancelIdleTimer()
                     }
+                // Every new manual/notification handoff revokes old agent context/review before reusing the socket.
+                geminiClient?.invalidateAgentContext()
                 if (geminiClient == null) {
                     initLiveSession(proactiveMsg)
                 } else if (proactiveMsg != null) {
                     // Send to existing session
-                    serviceScope.launch {
-                        geminiClient?.sendTextInput(proactiveMsg)
-                    }
+                    if (isGeminiReady) serviceScope.launch { geminiClient?.sendTextInput(proactiveMsg) }
+                    else pendingProactiveMessage = proactiveMsg
                 }
                 if (startWithCard && Settings.canDrawOverlays(this)) {
                     updateOverlay(OverlayState.CARD)
@@ -255,6 +275,8 @@ class VoiceLiveService : Service() {
     }
 
     override fun onDestroy() {
+        com.example.voicebrainlive.voice.AgentSpeech.complete(agentSpeechTicket, false)
+        agentSpeechTicket = null
         phoneExecutor?.invalidateApprovals()
         isServiceDestroyed = true
         micRestartJob?.cancel()
@@ -356,7 +378,15 @@ class VoiceLiveService : Service() {
         audioRecorder = AudioRecorderHelper().apply {
             useVoiceCommunicationForNoisyEnv = SettingsActivity.isNoisyEnvMode(this@VoiceLiveService)
         }
-        audioPlayer = AudioPlayerHelper()
+        audioPlayer = AudioPlayerHelper().apply {
+            onError = { message ->
+                serviceScope.launch(Dispatchers.Main) {
+                    currentStatusText = message
+                    VoiceLiveServiceManager.listener?.onError(message)
+                    updateOverlayUi()
+                }
+            }
+        }
 
         val useVoiceProfile = SettingsActivity.isVoiceProfileEnabled(this) &&
             VoiceProfileManager(this).isTrained()
@@ -365,7 +395,10 @@ class VoiceLiveService : Service() {
                 context = this,
                 onForward = { base64 ->
                     val player = audioPlayer
-                    if (player != null && !player.isActuallySpeaking() && TtsUnifiedInterface.isAnyInstanceSpeaking() != true) {
+                    if (player != null && com.example.voicebrainlive.voice.VoiceInputPolicy.mayForward(
+                            audioRecorder?.isRecording() == true && isConnected,
+                            isMuted || isPaused, player.isActuallySpeaking(), TtsUnifiedInterface.isAnyInstanceSpeaking(),
+                            com.example.voicebrainlive.voice.VoiceInteractionPreferences.interruptionEnabled(this@VoiceLiveService))) {
                         geminiClient?.sendAudioChunk(base64)
                     }
                 },
@@ -382,6 +415,7 @@ class VoiceLiveService : Service() {
         }
 
         geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra) { cmd, target, value ->
+            if (agentSpeechTicket != null) return@GeminiLiveClient "Announcement only: tool execution is disabled."
             Log.d(TAG, "Command received: $cmd, target=$target, value=$value")
             val replyCmds = setOf(
                 "send_messenger", "send_whatsapp", "send_sms", "send_facebook_message", "messenger", "whatsapp"
@@ -605,6 +639,10 @@ class VoiceLiveService : Service() {
     private fun setupClientCallbacks() {
 
         val client = geminiClient ?: return
+        // Manual conversation only. Notification sessions cannot arm/persist agent proposals.
+        if (!isNotificationSession) client.agentFactory = { session, current, display ->
+            com.example.voicebrainlive.agent.brain.AndroidConversationAgent.create(this, session, { current() && !isNotificationSession }, display)
+        }
 
         client.onConnected = connected@{
             if (geminiClient !== client) return@connected
@@ -655,6 +693,10 @@ class VoiceLiveService : Service() {
         }
 
         client.onDisconnected = {
+            com.example.voicebrainlive.voice.AgentSpeech.complete(agentSpeechTicket, false)
+            agentSpeechTicket = null
+            releasePlaybackFocus(audioPlayer)
+            audioPlayer?.stop()
             phoneExecutor?.invalidateApprovals()
             isConnected = false
             isGeminiSetupComplete = false
@@ -666,6 +708,8 @@ class VoiceLiveService : Service() {
         }
 
         client.onReconnecting = { attempt, delayMs ->
+            releasePlaybackFocus(audioPlayer)
+            audioPlayer?.stop()
             phoneExecutor?.invalidateApprovals()
             isConnected = false
             isGeminiSetupComplete = false
@@ -676,21 +720,39 @@ class VoiceLiveService : Service() {
             updateOverlayUi()
         }
 
-        client.onAudioChunk = { base64 ->
+        client.onAudioChunk = audio@{ base64 ->
+            if (cancelledAgentSpeech) return@audio
+            // Preserve this helper/generation before any listener or UI work.
+            val player = audioPlayer
+            val producer = if (!FocusMode.isActive(this)) player?.captureStartedProducer() else null
+            if (player == null || producer == null || !preparePlaybackFocus(player)) return@audio
+            if (agentSpeechTicket != null) agentSpeechHadAudio = true
             cancelIdleTimer()
             cancelSilenceTimeout()
             currentStatusText = "Speaking..."
             VoiceLiveServiceManager.listener?.onAudioChunk(base64)
-            playAudioChunk(base64)
+            playAudioChunk(player, producer, base64)
             updateOverlayUi()
         }
 
-        client.onAudioBytes = { bytes ->
+        client.onAudioBytes = audio@{ bytes ->
+            if (cancelledAgentSpeech) return@audio
+            val player = audioPlayer
+            val producer = if (!FocusMode.isActive(this)) player?.captureStartedProducer() else null
+            if (player == null || producer == null || !preparePlaybackFocus(player)) return@audio
+            if (agentSpeechTicket != null) agentSpeechHadAudio = true
             cancelIdleTimer()
             cancelSilenceTimeout()
             currentStatusText = "Speaking..."
             VoiceLiveServiceManager.listener?.onAudioBytes(bytes)
-            playAudioBytes(bytes)
+            playAudioBytes(player, producer, bytes)
+            updateOverlayUi()
+        }
+
+        client.onAgentTranscript = { text, current ->
+            // Do not add private previews/drafts to currentAiResponse, VoiceHistory or conversation summarization.
+            currentStatusText = "Agent activity"
+            if (current()) VoiceLiveServiceManager.listener?.onAgentTranscript(text, current)
             updateOverlayUi()
         }
 
@@ -708,11 +770,17 @@ class VoiceLiveService : Service() {
                 hasUserSpokenInNotificationSession = true
                 if (isNotificationSession && isExplicitReplyRequest(normalized)) {
                     notificationReplyAuthorized = true
-                    Log.d(TAG, "Explicit user reply request authorized for notification session: $text")
+                    Log.d(TAG, "Explicit notification reply intent detected")
                 }
                 currentUserInput = text
 
                 lastTranscriptText = text
+                if (com.example.voicebrainlive.routines.WakeAlarmService.active &&
+                    com.example.voicebrainlive.routines.SleepWakePhrases.isWakeStop(text)) {
+                    audioPlayer?.clearQueue()
+                    val executor = phoneExecutor ?: PhoneCommandExecutor(this).also { phoneExecutor = it }
+                    serviceScope.launch { executor.executeAsync("stop_wake_alarm", null, null) }
+                }
                 currentStatusText = "Listening..."
                 cancelIdleTimer()
                 cancelSilenceTimeout()
@@ -724,7 +792,7 @@ class VoiceLiveService : Service() {
                         "no", "cancel", "stop", "close", "done"
                     )
                     if (dismissPhrases.any { lower.contains(it) }) {
-                        Log.d(TAG, "Notification session dismissed by user speech: $text")
+                        Log.d(TAG, "Notification session dismissed by user speech")
                         scheduleNotificationAutoClose(300L)
                     } else {
                         val timeoutSeconds = SettingsActivity.getNotificationAutoTimeoutSeconds(this).coerceIn(6, 30)
@@ -744,13 +812,29 @@ class VoiceLiveService : Service() {
         }
 
         client.onTurnComplete = {
+            val completedSpeech = agentSpeechTicket
+            val speechHadAudio = agentSpeechHadAudio
+            cancelledAgentSpeech = false
+            if (completedSpeech != null) serviceScope.launch {
+                kotlinx.coroutines.delay(250)
+                kotlinx.coroutines.withTimeoutOrNull(30_000) {
+                    while (audioPlayer?.isActuallySpeaking() == true) kotlinx.coroutines.delay(100)
+                }
+                if (agentSpeechTicket == completedSpeech) {
+                    agentSpeechTicket = null
+                    com.example.voicebrainlive.voice.AgentSpeech.complete(completedSpeech, speechHadAudio)
+                }
+            }
             if (currentAiResponse.isNotBlank()) {
                 VoiceHistory.add(this, currentUserInput, currentAiResponse.trim())
                 saveConversationMemory(currentUserInput, currentAiResponse)
                 currentAiResponse = ""
                 currentUserInput = "🎤"
             }
-            isFirstAudioChunkOfTurn = true
+            synchronized(playbackFocusLock) {
+                isFirstAudioChunkOfTurn = true
+                focusUnavailableForTurn = false
+            }
             currentStatusText = "Listening..."
 
             if (isNotificationSession) {
@@ -780,6 +864,7 @@ class VoiceLiveService : Service() {
                 currentUserInput = "🎤"
             }
             audioPlayer?.clearQueue()
+            releasePlaybackFocus(audioPlayer)
             isFirstAudioChunkOfTurn = true
             currentStatusText = "Listening..."
             if (isNotificationSession) {
@@ -796,11 +881,14 @@ class VoiceLiveService : Service() {
         client.onError = { raw ->
             currentStatusText = "Error"
             lastTranscriptText = raw
-            Log.e(TAG, "Gemini Error: $raw")
+            Log.e(TAG, "Voice provider error received")
             VoiceLiveServiceManager.listener?.onError(raw)
             updateOverlayUi()
 
             // Offline TTS fallback for notification announcements if Gemini connection fails
+            // Native-audio-only policy: show the error and stop; never synthesize a fallback voice.
+            com.example.voicebrainlive.voice.AgentSpeech.complete(agentSpeechTicket, false)
+            agentSpeechTicket = null
             if (isNotificationSession && pendingProactiveMessage != null) {
                 val fallbackAnnounce = if (currentNotifApp.isNotBlank() && currentNotifText.isNotBlank()) {
                     "$currentNotifApp ကနေ $currentNotifSender ပို့ထားတဲ့ '$currentNotifText' ဆိုတဲ့ စာဝင်လာပါတယ်"
@@ -811,12 +899,9 @@ class VoiceLiveService : Service() {
                 }
                 if (fallbackAnnounce.isNotBlank()) {
                     pendingProactiveMessage = null
-                    com.example.voicebrainlive.usecases.OneShotTtsSpeaker(this@VoiceLiveService).speak(
-                        fallbackAnnounce,
-                        "notif_fallback"
-                    ) {
-                        scheduleNotificationAutoClose(2000L)
-                    }
+                    currentStatusText = "Agent အသံချိတ်ဆက်၍မရပါ။ ပြန်လည်ချိတ်ဆက်ရန် နှိပ်ပါ။"
+                    updateOverlayUi()
+                    scheduleNotificationAutoClose(2000L)
                 }
             }
         }
@@ -825,7 +910,10 @@ class VoiceLiveService : Service() {
             micRestartAttempts = 0
             if (!isMuted && !isPaused) {
 
-                if (audioPlayer?.isActuallySpeaking() == false && TtsUnifiedInterface.isAnyInstanceSpeaking() != true) {
+                if (audioPlayer != null && com.example.voicebrainlive.voice.VoiceInputPolicy.mayForward(
+                        audioRecorder?.isRecording() == true && geminiClient === client,
+                        isMuted || isPaused, audioPlayer?.isActuallySpeaking() == true, TtsUnifiedInterface.isAnyInstanceSpeaking(),
+                        com.example.voicebrainlive.voice.VoiceInteractionPreferences.interruptionEnabled(this@VoiceLiveService))) {
                     // Check RMS for user voice activity during notification sessions
                     try {
                         val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
@@ -905,34 +993,41 @@ class VoiceLiveService : Service() {
         }
     }
 
-    private fun playAudioChunk(base64: String) {
+    private fun preparePlaybackFocus(player: AudioPlayerHelper): Boolean = synchronized(playbackFocusLock) {
+        if (focusUnavailableForTurn) return@synchronized false
+        if (isFirstAudioChunkOfTurn) {
+            if (!AudioFocusHelper.requestForSpeech(this, player)) {
+                focusUnavailableForTurn = true
+                player.onError?.invoke("Audio focus unavailable; text response remains available.")
+                return@synchronized false
+            }
+            isFirstAudioChunkOfTurn = false
+        }
+        true
+    }
+
+    private fun releasePlaybackFocus(player: AudioPlayerHelper?) = synchronized(playbackFocusLock) {
+        if (player != null) AudioFocusHelper.abandon(this, player)
+        isFirstAudioChunkOfTurn = true
+        focusUnavailableForTurn = false
+    }
+
+    private fun playAudioChunk(player: AudioPlayerHelper,
+        producer: com.example.voicebrainlive.audio.BoundedPlaybackController.Producer, base64: String) {
         if (!FocusMode.isActive(this)) {
-            if (isFirstAudioChunkOfTurn) {
-                AudioFocusHelper.requestForSpeech(this)
-                isFirstAudioChunkOfTurn = false
-            }
-            if (audioPlayer?.isPlaying() == false) {
-                audioPlayer?.start()
-            }
             try {
-                audioPlayer?.playBase64(base64)
+                player.playBase64(producer, base64)
             } catch (e: Exception) {
                 Log.e(TAG, "playBase64 error: ${e.message}")
             }
         }
     }
 
-    private fun playAudioBytes(bytes: ByteArray) {
+    private fun playAudioBytes(player: AudioPlayerHelper,
+        producer: com.example.voicebrainlive.audio.BoundedPlaybackController.Producer, bytes: ByteArray) {
         if (!FocusMode.isActive(this)) {
-            if (isFirstAudioChunkOfTurn) {
-                AudioFocusHelper.requestForSpeech(this)
-                isFirstAudioChunkOfTurn = false
-            }
-            if (audioPlayer?.isPlaying() == false) {
-                audioPlayer?.start()
-            }
             try {
-                audioPlayer?.playRaw(bytes)
+                player.playRaw(producer, bytes)
             } catch (e: Exception) {
                 Log.e(TAG, "playRaw error: ${e.message}")
             }
@@ -955,8 +1050,29 @@ class VoiceLiveService : Service() {
     }
 
     fun sendTextInput(text: String) {
-        currentUserInput = "⌨️ $text"
-        geminiClient?.sendTextInput(text)
+        currentUserInput = if (com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) "ခေါ်ဆိုရန် အတည်ပြုချက်" else "⌨️ $text"
+        if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) {
+            // This method receives direct user text, never model/proactive tool-result text.
+            val executor = phoneExecutor ?: PhoneCommandExecutor(this).also { phoneExecutor = it }
+            serviceScope.launch {
+                val result = com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
+                    { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
+                    { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync)
+                if (result != null) {
+                    if (phoneExecutor !== executor || !serviceJob.isActive) return@launch
+                    geminiClient?.invalidateAgentContext()
+                    lastTranscriptText = result
+                    currentStatusText = result
+                    VoiceLiveServiceManager.listener?.onTranscript(result)
+                    com.example.voicebrainlive.commands.ChatUiBridge.notifyAssistant(result)
+                    updateOverlayUi()
+                } else {
+                    geminiClient?.sendConversationInput(text)
+                }
+            }
+            return
+        }
+        geminiClient?.sendConversationInput(text)
     }
 
     fun toggleMute() {
@@ -967,6 +1083,7 @@ class VoiceLiveService : Service() {
     fun togglePause() {
         isPaused = !isPaused
         if (isPaused) {
+            releasePlaybackFocus(audioPlayer)
             audioRecorder?.stop()
             audioPlayer?.stop()
             currentStatusText = "Paused"
@@ -980,6 +1097,7 @@ class VoiceLiveService : Service() {
 
     fun stopLiveSession() {
         Log.w(TAG, "Stopping live session")
+        releasePlaybackFocus(audioPlayer)
         try {
             audioRecorder?.stop()
             audioPlayer?.stop()
@@ -1219,6 +1337,7 @@ object VoiceLiveServiceManager {
         fun onAudioChunk(base64: String)
         fun onAudioBytes(bytes: ByteArray)
         fun onTranscript(text: String)
+        fun onAgentTranscript(text: String, current: () -> Boolean) {}
         fun onInputTranscript(text: String)
         fun onTaskStarted()
         fun onTurnComplete()

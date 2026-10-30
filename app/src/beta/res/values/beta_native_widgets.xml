@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Theme.VoiceBrainLive" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@color/assistant_bg_gradient_end</item>
+    <item name="android:windowBackground">@color/assistant_bg</item>
+    <item name="android:colorBackground">?attr/colorSurface</item>
+    <item name="android:colorBackgroundFloating">?attr/colorSurface</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    <item name="colorPrimary">@color/assistant_primary</item>
+    <item name="colorPrimaryVariant">@color/assistant_primary_light</item>
+    <item name="colorOnPrimary">@color/assistant_text</item>
+    <item name="colorSecondary">@color/assistant_secondary</item>
+    <item name="colorOnSecondary">@color/assistant_text</item>
+    <item name="colorSurface">@color/assistant_surface</item>
+    <item name="colorOnSurface">@color/assistant_text</item>
+    <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+    <item name="android:textColorSecondary">?attr/colorOnSurface</item>
+    <item name="android:textColorHint">?attr/colorOnSurface</item>
+    <item name="android:colorControlNormal">?attr/colorOnSurface</item>
+    <item name="android:colorControlActivated">?attr/colorPrimary</item>
+    <item name="android:textViewStyle">@style/Beta.NativeText</item>
+    <item name="android:buttonStyle">@style/Beta.NativeButton</item>
+    <item name="android:spinnerStyle">@style/Beta.NativeSpinner</item>
+    <item name="android:spinnerDropDownItemStyle">@style/Beta.DropDownText</item>
+    <item name="android:editTextStyle">@style/Beta.NativeEdit</item>
+  </style>
+  <style name="Theme.VoiceBrainLive.Light" parent="Theme.MaterialComponents.Light.NoActionBar">
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@color/light_surface</item>
+    <item name="android:windowBackground">@drawable/bg_gradient_light</item>
+    <item name="android:colorBackground">?attr/colorSurface</item>
+    <item name="android:colorBackgroundFloating">?attr/colorSurface</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    <item name="colorPrimary">@color/assistant_primary</item>
+    <item name="colorPrimaryVariant">@color/assistant_primary_light</item>
+    <item name="colorOnPrimary">@color/white</item>
+    <item name="colorSecondary">@color/assistant_secondary</item>
+    <item name="colorOnSecondary">@color/white</item>
+    <item name="colorSurface">@color/light_surface</item>
+    <item name="colorOnSurface">@color/light_text</item>
+    <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+    <item name="android:textColorSecondary">?attr/colorOnSurface</item>
+    <item name="android:textColorHint">?attr/colorOnSurface</item>
+    <item name="android:colorControlNormal">?attr/colorOnSurface</item>
+    <item name="android:colorControlActivated">?attr/colorPrimary</item>
+    <item name="android:textViewStyle">@style/Beta.NativeText</item>
+    <item name="android:buttonStyle">@style/Beta.NativeButton</item>
+    <item name="android:spinnerStyle">@style/Beta.NativeSpinner</item>
+    <item name="android:spinnerDropDownItemStyle">@style/Beta.DropDownText</item>
+    <item name="android:editTextStyle">@style/Beta.NativeEdit</item>
+  </style>
+  <style name="Beta.NativeText" parent="android:style/Widget.TextView">
+    <item name="android:textColor">?attr/colorOnSurface</item>
+    <item name="android:fontFamily">sans-serif</item>
+    <item name="android:includeFontPadding">true</item>
+    <item name="android:lineSpacingExtra">2dp</item>
+  </style>
+  <style name="Beta.NativeButton" parent="android:style/Widget.Material.Button">
+    <item name="android:textColor">@color/beta_button_text</item>
+    <item name="android:background">@drawable/beta_button_surface</item>
+    <item name="android:backgroundTint">@null</item>
+    <item name="android:textAllCaps">false</item>
+    <item name="android:textSize">14sp</item>
+    <item name="android:minHeight">48dp</item>
+    <item name="android:minWidth">0dp</item>
+    <item name="android:paddingLeft">12dp</item>
+    <item name="android:paddingRight">12dp</item>
+    <item name="android:paddingTop">8dp</item>
+    <item name="android:paddingBottom">8dp</item>
+    <item name="android:stateListAnimator">@null</item>
+  </style>
+  <style name="Beta.NativeSpinner" parent="android:style/Widget.Material.Spinner">
+    <item name="android:minHeight">48dp</item>
+    <item name="android:popupBackground">?attr/colorSurface</item>
+    <item name="android:backgroundTint">?attr/colorOnSurface</item>
+  </style>
+  <style name="Beta.DropDownText" parent="android:style/Widget.DropDownItem.Spinner">
+    <item name="android:textColor">?attr/colorOnSurface</item>
+    <item name="android:fontFamily">sans-serif</item>
+    <item name="android:includeFontPadding">true</item>
+    <item name="android:lineSpacingExtra">2dp</item>
+    <item name="android:background">?attr/colorSurface</item>
+    <item name="android:minHeight">48dp</item>
+    <item name="android:padding">8dp</item>
+  </style>
+  <style name="Beta.NativeEdit" parent="android:style/Widget.Material.EditText">
+    <item name="android:textColor">?attr/colorOnSurface</item>
+    <item name="android:fontFamily">sans-serif</item>
+    <item name="android:includeFontPadding">true</item>
+    <item name="android:lineSpacingExtra">2dp</item>
+    <item name="android:textColorHint">?attr/colorOnSurface</item>
+    <item name="android:minHeight">48dp</item>
+  </style>
+</resources>

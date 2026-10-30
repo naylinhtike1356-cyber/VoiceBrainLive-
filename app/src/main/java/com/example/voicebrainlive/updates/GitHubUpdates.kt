@@ -11,27 +11,58 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-data class AvailableUpdate(val manifest: ReleaseManifest, val assetId: Long)
+data class AvailableUpdate(val manifest: ReleaseManifest, val assetId: Long, val downloadUrl: String = "")
 
-class GitHubUpdates(private val token: String) {
-    private val baseUrl = "https://api.github.com/repos/${BuildConfig.UPDATE_REPOSITORY}"
-    private val client = OkHttpClient.Builder()
+class GitHubReleaseProvider(
+    private val token: String = "",
+    private val repository: String = ""
+) : ReleaseProvider {
+    val gitHubUpdates = GitHubUpdates(token, repository)
+    var lastAvailableUpdate: AvailableUpdate? = null
+        private set
+
+    override val configured: Boolean
+        get() = repository.isNotBlank() || BuildConfig.UPDATE_REPOSITORY.isNotBlank()
+
+    override suspend fun latest(): ReleaseManifest? {
+        if (!configured) return null
+        val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            gitHubUpdates.latest("com.example.voicebrainlive")
+        }
+        lastAvailableUpdate = result
+        return result.manifest
+    }
+}
+
+class GitHubUpdates(
+    private val token: String = "",
+    private val repository: String = "",
+    private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS)
         .callTimeout(10, TimeUnit.MINUTES).build()
+) {
+    private val targetRepo = repository.ifBlank { BuildConfig.UPDATE_REPOSITORY.ifBlank { "naylinhtike1356-cyber/VoiceBrainLive-" } }
+    private val baseUrl = "https://api.github.com/repos/$targetRepo"
+    init { require(targetRepo.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) }
 
-    private fun request(url: String, binary: Boolean = false): Request = Request.Builder()
-        .url(url).header("Authorization", "Bearer $token")
-        .header("Accept", if (binary) "application/octet-stream" else "application/vnd.github+json")
-        .header("User-Agent", "VoiceBrainLive/${BuildConfig.VERSION_NAME}").build()
+    private fun request(url: String, binary: Boolean = false): Request {
+        val builder = Request.Builder()
+            .url(url)
+            .header("Accept", if (binary) "application/octet-stream" else "application/vnd.github+json")
+            .header("User-Agent", "VoiceBrainLive/${BuildConfig.VERSION_NAME}")
+        if (token.isNotBlank()) {
+            builder.header("Authorization", "Bearer $token")
+        }
+        return builder.build()
+    }
 
     private fun failure(code: Int): IOException = IOException(when (code) {
-        401, 403 -> "GitHub access denied. Check the token's Contents read permission."
-        404 -> "No release found, or this token cannot access the private repository."
+        401, 403, 429 -> "GitHub update access is temporarily unavailable or rate limited. Please try again later."
+        404 -> "No public stable release is available yet."
         else -> "GitHub update request failed ($code). Please try again later."
     })
 
     fun latest(packageName: String): AvailableUpdate {
-        require(token.isNotBlank()) { "Enter a GitHub token for this private repository." }
         val release = client.newCall(request("$baseUrl/releases/latest")).execute().use { response ->
             if (!response.isSuccessful) throw failure(response.code)
             val body = response.body ?: throw IOException("Empty release response")
@@ -39,11 +70,13 @@ class GitHubUpdates(private val token: String) {
         }
         require(!release.optBoolean("draft") && !release.optBoolean("prerelease")) { "Release is not stable" }
         val assets = release.getJSONArray("assets")
-        fun assetId(name: String): Long = (0 until assets.length()).map { assets.getJSONObject(it) }
+        fun asset(name: String): JSONObject = (0 until assets.length()).map { assets.getJSONObject(it) }
             .firstOrNull { it.optString("name") == name && it.optString("state") == "uploaded" }
-            ?.getLong("id") ?: throw IOException("Release is missing $name")
-        val manifestId = assetId("update.json")
-        val manifest = client.newCall(request("$baseUrl/releases/assets/$manifestId", true)).execute().use { response ->
+            ?: throw IOException("Release is missing $name")
+        fun assetUrl(asset: JSONObject): String = if (token.isNotBlank()) {
+            "$baseUrl/releases/assets/${asset.getLong("id")}"
+        } else trustedDownloadUrl(asset.getString("browser_download_url"), targetRepo)
+        val manifest = client.newCall(request(assetUrl(asset("update.json")), true)).execute().use { response ->
             if (!response.isSuccessful) throw failure(response.code)
             val body = response.body ?: throw IOException("Empty update manifest")
             body.byteStream().use { input ->
@@ -58,14 +91,22 @@ class GitHubUpdates(private val token: String) {
                 ReleaseManifest.parse(String(bytes, 0, total, Charsets.UTF_8), packageName)
             }
         }
-        return AvailableUpdate(manifest, assetId(ReleaseManifest.APK_NAME))
+        val apk = asset(ReleaseManifest.APK_NAME)
+        require(apk.getLong("size") == manifest.size) { "Release asset size does not match metadata" }
+        return AvailableUpdate(manifest, apk.getLong("id"), assetUrl(apk))
     }
 
-    suspend fun download(update: AvailableUpdate, destination: File): File {
+    suspend fun download(
+        update: AvailableUpdate,
+        destination: File,
+        onProgress: ((bytesDownloaded: Long, totalBytes: Long) -> Unit)? = null
+    ): File {
         val digest = MessageDigest.getInstance("SHA-256")
         var complete = false
         try {
-            client.newCall(request("$baseUrl/releases/assets/${update.assetId}", true)).execute().use { response ->
+            val url = update.downloadUrl.ifBlank { "$baseUrl/releases/assets/${update.assetId}" }
+            if (token.isBlank()) trustedDownloadUrl(url, targetRepo)
+            client.newCall(request(url, true)).execute().use { response ->
                 if (!response.isSuccessful) throw failure(response.code)
                 val body = response.body ?: throw IOException("Empty APK response")
                 body.byteStream().use { input ->
@@ -80,6 +121,7 @@ class GitHubUpdates(private val token: String) {
                             require(total <= update.manifest.size) { "APK exceeds the expected size" }
                             digest.update(buffer, 0, count)
                             output.write(buffer, 0, count)
+                            onProgress?.invoke(total, update.manifest.size)
                         }
                         require(total == update.manifest.size) { "APK download is incomplete" }
                     }
@@ -91,6 +133,17 @@ class GitHubUpdates(private val token: String) {
             return destination
         } finally {
             if (!complete) destination.delete()
+        }
+    }
+
+    companion object {
+        internal fun trustedDownloadUrl(url: String, repository: String): String {
+            val parsed = java.net.URI(url)
+            require(parsed.scheme == "https" && parsed.host == "github.com" && parsed.userInfo == null &&
+                parsed.port == -1 && parsed.rawQuery == null && parsed.rawFragment == null &&
+                parsed.rawPath.startsWith("/$repository/releases/download/") &&
+                !parsed.rawPath.contains("..")) { "Invalid release asset URL" }
+            return url
         }
     }
 }

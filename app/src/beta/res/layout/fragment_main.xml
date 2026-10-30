@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Simplified Top Bar -->
+        <LinearLayout android:tag="beta_app_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="8dp"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:id="@+id/tvAppTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/app_name"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:gravity="start" />
+
+            <ImageButton
+                android:id="@+id/btnGuide"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_info_details"
+                android:contentDescription="@string/desc_guide"
+                app:tint="?attr/colorOnSurface"
+                android:padding="8dp"
+                android:scaleType="centerInside" />
+
+            <ImageButton
+                android:id="@+id/btnSettings"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_settings"
+                android:padding="8dp"
+                android:scaleType="centerInside" />
+        </LinearLayout>
+
+        <!-- Offline Banner -->
+        <LinearLayout
+            android:id="@+id/offlineBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#CCF59E0B"
+            android:padding="10dp"
+            android:layout_marginHorizontal="16dp"
+            android:visibility="gone">
+            <View android:layout_width="8dp" android:layout_height="8dp" android:background="@drawable/status_dot" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:text="@string/offline_local_only" android:textColor="#1F2937" android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Fragment Host -->
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/fragmentHost"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Primary navigation, hidden only while the keyboard needs the space. -->
+        <LinearLayout android:tag="beta_primary_nav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="?attr/colorSurface"
+            android:elevation="8dp">
+
+            <!-- Gems expanded panel placeholder -->
+            <LinearLayout
+                android:id="@+id/gemsExpandedPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:padding="8dp">
+                <!-- Gems content... -->
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="64dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:id="@+id/navHome"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:padding="6dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground">
+                    <ImageView
+                        android:id="@+id/ivNavHome"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_nav_home"
+                        app:tint="@color/assistant_primary_light" />
+                    <TextView
+                        android:id="@+id/tvNavHome"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="Home"
+                        android:textSize="11sp" android:includeFontPadding="true" android:gravity="center" android:lineSpacingExtra="2dp"
+                        android:textColor="@color/assistant_primary_light"
+                        android:fontFamily="sans-serif" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/navChat"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:padding="6dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground">
+                    <ImageView
+                        android:id="@+id/ivNavChat"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_nav_chat"
+                        app:tint="?attr/colorOnSurface" />
+                    <TextView
+                        android:id="@+id/tvNavChat"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="Chat"
+                        android:textSize="11sp" android:includeFontPadding="true" android:gravity="center" android:lineSpacingExtra="2dp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:fontFamily="sans-serif" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/navAutomation"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:padding="6dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground">
+                    <ImageView
+                        android:id="@+id/ivNavAutomation"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@android:drawable/ic_menu_agenda"
+                        app:tint="?attr/colorOnSurface" />
+                    <TextView
+                        android:id="@+id/tvNavAutomation"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="Tasks"
+                        android:textSize="11sp" android:includeFontPadding="true" android:gravity="center" android:lineSpacingExtra="2dp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:fontFamily="sans-serif" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/navCamera"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="64dp"
+                    android:padding="6dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground">
+                    <ImageView
+                        android:id="@+id/ivNavCamera"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_notes"
+                        app:tint="?attr/colorOnSurface" />
+                    <TextView
+                        android:id="@+id/tvNavCamera"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="Memory"
+                        android:textSize="11sp" android:includeFontPadding="true" android:gravity="center" android:lineSpacingExtra="2dp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:fontFamily="sans-serif" />
+                </LinearLayout>
+
+                <Button android:tag="beta_nav_settings"
+                    android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:minHeight="64dp" android:minWidth="0dp" android:padding="4dp" android:text="Settings"
+                    android:drawableTop="@drawable/ic_settings" android:drawableTint="?attr/colorOnSurface" android:drawablePadding="3dp"
+                    android:textAllCaps="false" android:textSize="11sp" android:includeFontPadding="true" android:gravity="center" android:lineSpacingExtra="2dp" android:textColor="?attr/colorOnSurface"
+                    android:contentDescription="Settings" android:background="?android:attr/selectableItemBackground" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

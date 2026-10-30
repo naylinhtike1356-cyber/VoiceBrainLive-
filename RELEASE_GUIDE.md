@@ -1,25 +1,22 @@
 # VoiceBrainLive Releases
 
-Distribution uses the private repository `naylinhtike1356-cyber/VoiceBrainLive-`.
-Only GitHub accounts with access can download its releases.
+Distribution uses the public repository `naylinhtike1356-cyber/VoiceBrainLive-`.
+Anyone can download releases without a GitHub account or token.
 
 ## Install and update
 
-Download `VoiceBrainLive.apk` from the latest GitHub release while signed in.
+Download `VoiceBrainLive.apk` from the latest GitHub release.
 In Android, approve installation from your browser when prompted.
 
-Inside VoiceBrainLive, open Settings > App updates. For direct update checks,
-enter your own GitHub fine-grained personal access token restricted to this
-repository with Contents: Read-only permission. Organization approval, if
-applicable, must be completed first. No publisher token is included in the APK.
-Alternatively, open the GitHub release page from this screen and use browser
-sign-in without storing a token in the app.
+Inside VoiceBrainLive, open Settings > App updates, tap Check for updates,
+then Download & Install. No token entry or GitHub login is required.
+Public asset URLs are restricted to the configured repository. Private pilot
+and isolated test packages do not receive original-package updates.
 
 The updater compares version codes, validates APK size and SHA-256, then checks
 the package name, version, and signing certificate against the installed app.
-Android requires your confirmation before installing. Tokens are saved only
-when encrypted storage is available, excluded from backups, and never logged.
-Clear the token field and check again to delete the saved token.
+Android requires your confirmation before installing. The app never uses any
+previously saved GitHub update token for public updates.
 
 An existing debug-signed installation cannot be updated with a release-signed
 APK. Back up/export its data before replacing it. Uninstalling clears app data.
@@ -44,3 +41,15 @@ Publish a stable GitHub release with these exact asset names:
 Generate metadata from the actual signed APK. Upload both assets to a draft
 release before publishing it. Do not replace assets on an already published
 release; publish a higher version instead. The updater ignores prereleases.
+
+Run `powershell -File scripts/prepare-release.ps1` after `:app:assembleRelease`
+to prepare `.publication/release/VoiceBrainLive.apk` and `update.json` from the
+build output metadata and the actual APK hash. Publish both files together.
+
+## Agent audio
+
+Notifications wake the existing interactive Gemini agent and show its card.
+Legacy speech interfaces route to native agent audio; Android TTS engines are
+not initialized. If Android blocks a background launch, a notification opens
+the agent. If the provider fails, an error is shown without TTS fallback.
+User-created Clock alarms remain independent of network voice availability.

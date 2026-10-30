@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
  * Implements Autonomous Music Intelligence (Mood/Artist/Song detection and playback).
  */
 class MusicCommands(private val context: Context) : CommandHandler {
+    companion object { const val PAUSE_REQUESTED = "မီဒီယာ ရပ်ရန် အမိန့်ပို့ထားပါပြီ။" }
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -429,12 +430,12 @@ class MusicCommands(private val context: Context) : CommandHandler {
     }
 
     private fun pauseMedia(): String {
-        if (MediaSessionHelper.isNotificationAccessEnabled(context)) {
+        val sent = MediaSessionHelper.isNotificationAccessEnabled(context) &&
             MediaSessionHelper.tryPauseViaMediaController(context)
-        } else {
+        if (!sent) {
             sendMediaKey(KeyEvent.KEYCODE_MEDIA_PAUSE)
         }
-        return "မီဒီယာ ခေတ္တရပ်ထားလိုက်ပါပြီ"
+        return PAUSE_REQUESTED
     }
 
     private fun resumeMedia(): String {

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.VoiceBrainLive.AutomationHub" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/assistant_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/assistant_bg</item>
+        <item name="android:colorBackground">@color/assistant_bg</item>
+        <item name="colorPrimary">@color/assistant_primary_light</item>
+        <item name="colorOnPrimary">@color/assistant_bg</item>
+        <item name="colorSecondary">@color/assistant_secondary</item>
+        <item name="colorSurface">@color/assistant_surface</item>
+        <item name="colorOnSurface">@color/assistant_text</item>
+        <item name="colorOnSurfaceVariant">@color/assistant_text_secondary</item>
+    </style>
+    <style name="Theme.VoiceBrainLive.AutomationHub.Light" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/light_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">@color/light_bg</item>
+        <item name="android:colorBackground">@color/light_bg</item>
+        <item name="colorPrimary">@color/assistant_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSurface">@color/light_surface</item>
+        <item name="colorOnSurface">@color/light_text</item>
+        <item name="colorOnSurfaceVariant">@color/light_text_secondary</item>
+    </style>
+</resources>

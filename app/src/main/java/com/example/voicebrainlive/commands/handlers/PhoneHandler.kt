@@ -386,7 +386,7 @@ class PhoneHandler(
         }
 
         // (၂) API - Token ရှိပြီး recipient ပါမှ PSID lookup + API ဖြင့် ပို့မည်
-        val token = com.example.voicebrainlive.SettingsActivity.getSecurePrefs(context).getString(com.example.voicebrainlive.messenger.MessengerApiClient.PREF_MESSENGER_TOKEN, "")
+        val token = com.example.voicebrainlive.SettingsActivity.trySecurePrefs(context)?.getString(com.example.voicebrainlive.messenger.MessengerApiClient.PREF_MESSENGER_TOKEN, "")
         if (!token.isNullOrBlank() && !recipientHint.isNullOrBlank()) {
             return com.example.voicebrainlive.messenger.MessengerApiClient(context).sendMessageSync(recipientHint, cleanMsg)
         }

@@ -74,12 +74,17 @@ object ActionTargetResolver {
                 val resolved = resolvePhone(context, raw) ?: return null
                 if (canonical == "send_sms" && content.isNullOrBlank()) return null
                 val required = if (canonical == "send_sms") Manifest.permission.SEND_SMS else Manifest.permission.CALL_PHONE
+                val simulation = canonical == "make_call" && SettingsActivity.isTestCallMode(context)
                 val snapshot = ActionSnapshot(canonical, resolved.label, if (canonical == "send_sms") "Android SMS" else "Android Phone",
-                    resolved.id, content, if (canonical == "send_sms") "Send this exact message to ${resolved.number}" else "Call ${resolved.number}")
+                    resolved.id, content, if (canonical == "send_sms") "Send this exact message to ${resolved.number}" else if(simulation) "SIMULATION only; do not place a call to ${resolved.number}" else "Call ${resolved.number}")
                 return SensitiveActionGuard.Operation(snapshot,
-                    { permission(context, required) && resolvePhone(context, raw) == resolved }, {
+                    { permission(context, required) && resolvePhone(context, raw) == resolved &&
+                        (canonical != "make_call" || SettingsActivity.isTestCallMode(context) == simulation) }, {
                         coroutineContext.ensureActive()
+                        if(canonical == "make_call" && SettingsActivity.isTestCallMode(context) != simulation)
+                            return@Operation "BLOCKED: Call simulation mode changed; new approval required."
                         if (!permission(context, required)) "BLOCKED: Android permission revoked."
+                        else if(simulation) "SIMULATED_CALL: စမ်းသပ်မှုသာဖြစ်၍ ဖုန်းတကယ်မခေါ်ပါ။"
                         else try {
                             if (canonical == "send_sms") {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED)
@@ -92,6 +97,8 @@ object ActionTargetResolver {
                             } else {
                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED)
                                     return@Operation "BLOCKED: Phone permission revoked."
+                                if(SettingsActivity.isTestCallMode(context) != simulation)
+                                    return@Operation "BLOCKED: Call simulation mode changed; new approval required."
                                 context.startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:${resolved.number}"))
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                                 "Call requested."

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hub_title">အော်တိုမေးရှင်း ဗဟိုဌာန</string>
+    <string name="hub_entry_title">အော်တိုမေးရှင်းနှင့် အချိန်ကိုက်အလုပ်များ (Automation &amp; Tasks Hub)</string>
+    <string name="hub_entry_subtitle">အချိန်ကိုက်အလုပ်များ၊ နေ့စဉ်ရူတင်းများနှင့် အသံမက်ခရိုများ</string>
+    <string name="hub_scheduled_tab">အချိန်ကိုက် အလုပ်များ</string>
+    <string name="hub_routines_tab">နေ့စဉ် ရူတင်းများ</string>
+    <string name="hub_macros_tab">အသံ မက်ခရိုများ</string>
+    <string name="hub_scheduled_heading">အချိန်ကိုက် အလုပ်များ (Scheduled &amp; Notion Tasks)</string>
+    <string name="hub_routines_heading">နေ့စဉ် ရူတင်းများ (Routines &amp; Reminders)</string>
+    <string name="hub_macros_heading">အသံ မက်ခရိုများ (Voice Macros)</string>
+    <string name="hub_labs">စမ်းသပ်ခန်းနှင့် ချိတ်ဆက်မှုများ (Labs &amp; Connections)</string>
+    <string name="hub_active">ဖွင့်ထားသည်</string>
+    <string name="hub_paused">ခဏရပ်ထားသည်</string>
+    <string name="hub_completed">ပြီးပြီ</string>
+    <string name="hub_macro_active">အသံဖြင့် ခေါ်သုံးနိုင်သည်</string>
+    <string name="hub_macro_invalid">ကွန်မန်ဒ်များ ပြန်စစ်ရန် လိုသည်</string>
+    <string name="hub_add_macro">မက်ခရိုအသစ် ဖန်တီးရန်</string>
+    <string name="hub_connections">AI နှင့် Notion ချိတ်ဆက်ရန်</string>
+    <string name="hub_connected_tasks">ကျွန်ုပ်၏ အလုပ်များ</string>
+    <string name="hub_schedule_description">App၊ သီချင်းနှင့် AI အလုပ် အချိန်သတ်မှတ်ရန်</string>
+    <string name="hub_scheduled_legacy_label">အချိန်သတ်မှတ် အလုပ်များ</string>
+</resources>

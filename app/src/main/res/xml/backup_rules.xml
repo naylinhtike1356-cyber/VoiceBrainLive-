@@ -6,6 +6,7 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
+    <exclude domain="sharedpref" path="secure_health_prefs.xml" />
     <!-- Keep private keys, tokens, transcripts, and diagnostics out of cloud backup. -->
     <exclude domain="sharedpref" path="secure_settings.xml" />
     <exclude domain="sharedpref" path="github_updates_secure.xml" />

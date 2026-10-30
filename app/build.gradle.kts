@@ -24,6 +24,9 @@ fun getLocalProperty(key: String, default: String = ""): String {
     return localProperties.getProperty(key, default)
 }
 
+// Opt-in host-built original-package pilot; normal Debug/Release configuration remains unchanged.
+val agentUpdateCandidate = providers.gradleProperty("agentUpdateCandidate").orNull == "true"
+
 fun String.asBuildConfigString(): String {
     return "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }
@@ -36,8 +39,9 @@ android {
         applicationId = "com.example.voicebrainlive"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 13
+        versionName = "1.6.0"
+        buildConfigField("boolean", "PRIVATE_TEST_BUILD", "false")
         buildConfigField("String", "UPDATE_REPOSITORY", "\"naylinhtike1356-cyber/VoiceBrainLive-\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -60,6 +64,29 @@ android {
         }
     }
     buildTypes {
+        create("beta") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".interactivebeta"
+            versionNameSuffix = "-INTERACTIVE-BETA"
+            matchingFallbacks += listOf("debug")
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+            listOf("GEMINI_API_KEY", "YOUTUBE_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "SPOTIFY_CLIENT_ID", "UPDATE_REPOSITORY")
+                .forEach { buildConfigField("String", it, "\"\"") }
+            buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"voicebrainlive-beta://callback\"")
+        }
+        create("privateTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".privatelevel37"
+            versionNameSuffix = "-L37-PRIVATE-TEST"
+            matchingFallbacks += listOf("debug")
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+            buildConfigField("boolean", "PRIVATE_TEST_BUILD", "true")
+            listOf("GEMINI_API_KEY", "YOUTUBE_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "SPOTIFY_CLIENT_ID", "UPDATE_REPOSITORY")
+                .forEach { buildConfigField("String", it, "\"\"") }
+            buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"voicebrainlive-private-test://callback\"")
+        }
         create("deviceAcceptance") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".m16fixture"
@@ -71,10 +98,11 @@ android {
         }
         debug {
             // Debug builds may use local developer keys from local.properties.
-            buildConfigField("String", "GEMINI_API_KEY", getLocalProperty("GEMINI_API_KEY", "").asBuildConfigString())
-            buildConfigField("String", "YOUTUBE_API_KEY", getLocalProperty("YOUTUBE_API_KEY", "").asBuildConfigString())
-            buildConfigField("String", "OPENAI_API_KEY", getLocalProperty("OPENAI_API_KEY", "").asBuildConfigString())
-            buildConfigField("String", "SERPER_API_KEY", getLocalProperty("SERPER_API_KEY", "").asBuildConfigString())
+            buildConfigField("String", "GEMINI_API_KEY", (if(agentUpdateCandidate) "" else getLocalProperty("GEMINI_API_KEY", "")).asBuildConfigString())
+            buildConfigField("String", "YOUTUBE_API_KEY", (if(agentUpdateCandidate) "" else getLocalProperty("YOUTUBE_API_KEY", "")).asBuildConfigString())
+            buildConfigField("String", "OPENAI_API_KEY", (if(agentUpdateCandidate) "" else getLocalProperty("OPENAI_API_KEY", "")).asBuildConfigString())
+            buildConfigField("String", "SERPER_API_KEY", (if(agentUpdateCandidate) "" else getLocalProperty("SERPER_API_KEY", "")).asBuildConfigString())
+            if(agentUpdateCandidate) buildConfigField("String", "UPDATE_REPOSITORY", "\"\"")
         }
         release {
             if (releaseSigningFile.exists()) signingConfig = signingConfigs.getByName("distribution")
@@ -89,6 +117,17 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        // Private account pilot: retain the original 1.1.1 Release signing identity.
+        // Signing continuity is separate from clearance by a device malware classifier.
+        create("agentPilot") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.findByName("distribution")
+            isDebuggable = false
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks += listOf("release")
+            buildConfigField("String", "UPDATE_REPOSITORY", "\"\"")
         }
     }
     compileOptions {
@@ -113,6 +152,51 @@ android {
     if (providers.gradleProperty("m16").orNull == "true") {
         testBuildType = "deviceAcceptance"
     }
+    if (agentUpdateCandidate) {
+        // Keep the developer-only LeakCanary bootstrap out of the account pilot.
+        // Main supplies the original VoiceBrainApplication; normal Debug stays intact.
+        sourceSets.named("debug") {
+            java.setSrcDirs(emptyList<String>())
+            kotlin.setSrcDirs(emptyList<String>())
+            manifest.srcFile("src/agentUpdate/AndroidManifest.xml")
+        }
+    }
+}
+
+// Keep other variants usable without private signing material, but never package an
+// unsigned/Debug-signed original-app pilot when the original Release signer is absent.
+val originalAgentPilotSigningAvailable = android.signingConfigs.findByName("distribution") != null
+tasks.configureEach {
+    if (name == "packageAgentPilot") {
+        doFirst {
+            check(originalAgentPilotSigningAvailable) {
+                "Original Release signing configuration is required for agentPilot; no Debug or unsigned fallback."
+            }
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("agentPilot")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(12)
+            output.versionName.set("1.5.1-AGENT-PILOT")
+        }
+    }
+    onVariants(selector().withBuildType("debug")) { variant ->
+        if(agentUpdateCandidate) {
+        variant.outputs.forEach { output ->
+            output.versionCode.set(7)
+            output.versionName.set("1.3.0-AGENT-PILOT")
+        }
+        }
+    }
+    onVariants(selector().withBuildType("beta")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(6)
+            output.versionName.set("1.2.1-INTERACTIVE-BETA")
+        }
+    }
 }
 
 dependencies {
@@ -134,6 +218,7 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.startup:startup-runtime:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.10.5")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.health.connect:connect-client:1.1.0-alpha11")
@@ -153,7 +238,8 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
+    // A user account pilot must not automatically persist developer heap dumps.
+    if (!agentUpdateCandidate) debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
     
     // Phase 3: CameraX for Vision
     val camerax_version = "1.3.4"

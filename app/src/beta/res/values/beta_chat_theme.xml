@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The original chat layout uses this Material3 hint attribute with a MaterialComponents base theme. -->
+    <style name="ThemeOverlay.VoiceBrainLive.BetaChat" parent="">
+        <item name="colorOnSurfaceVariant">?attr/colorOnSurface</item>
+    </style>
+</resources>

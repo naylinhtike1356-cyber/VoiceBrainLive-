@@ -232,14 +232,14 @@ class PhoneCommandExecutor(private val context: Context) {
         return try {
             // Phase 1.1: Delegate to ToolRegistry (for Refactored Handlers)
             toolRegistry.executeCommandAsync(commandType, target, value)?.let { 
-                com.example.voicebrainlive.ActionRecordManager.recordAction(context, "Command", "Result: completed=${it.isNotBlank()}")
+                com.example.voicebrainlive.ActionRecordManager.recordAction(context, "Command", "Result: responsePresent=${it.isNotBlank()}")
                 return it 
             }
 
             val result = SensitiveActionGuard.run(context, approvalSession, commandType, target, value) {
                 executeFallback(commandType, target, value)
             }
-            com.example.voicebrainlive.ActionRecordManager.recordAction(context, "Command", "Result: completed=${result.isNotBlank()}")
+            com.example.voicebrainlive.ActionRecordManager.recordAction(context, "Command", "Result: responsePresent=${result.isNotBlank()}")
             if (CommandSafetyPolicy.classify(commandType) == CommandSafetyPolicy.Classification.SAFE)
                 recordLearnedIntentPattern(commandType, target, value)
             result
@@ -312,48 +312,40 @@ class PhoneCommandExecutor(private val context: Context) {
     }
 
     private fun createMacro(name: String, commandsSequence: String): String {
-        if (name.isBlank() || commandsSequence.isBlank()) {
-            return "မက်ခရိုအမည် သို့မဟုတ် ကွန်မန်ဒ်အစီအစဉ် မမှန်ကန်ပါ။"
+        val normalized = name.trim().lowercase(Locale.ROOT)
+        if (normalized.isBlank() || normalized.length > BoundedMacroRunner.MAX_NAME_CHARS ||
+            commandsSequence.isBlank() || commandsSequence.length > BoundedMacroRunner.MAX_SEQUENCE_CHARS) {
+            return "BLOCKED: Macro name/sequence exceeds its local storage bounds; no write performed."
         }
         val macroPrefs = context.getSharedPreferences("custom_macros", Context.MODE_PRIVATE)
-        macroPrefs.edit().putString(name.lowercase().trim(), commandsSequence).apply()
+        if (!macroPrefs.edit().putString(normalized, commandsSequence).commit())
+            return "FAILED: Macro definition could not be persisted. No execution started."
         return "မက်ခရို '$name' ကို အောင်မြင်စွာ ဖန်တီးပြီးပါပြီ။"
     }
 
     private suspend fun runMacro(name: String): String {
-        if (name.isBlank()) return "မက်ခရိုအမည် မရှိပါ။"
         val macroPrefs = context.getSharedPreferences("custom_macros", Context.MODE_PRIVATE)
-        val sequence = macroPrefs.getString(name.lowercase().trim(), null)
-            ?: return "မက်ခရို '$name' ကို ရှာမတွေ့ပါ။"
-        
-        val commandList = AutomationCommandValidator.extractSteps(sequence)
-        val results = mutableListOf<String>()
-        for (cmdStr in commandList) {
-            val trimmed = cmdStr.trimStart()
-            if (trimmed.isBlank()) continue
-            
-            val match = if (trimmed.contains(":")) null else OfflineCommandMatcher.match(trimmed)
-            val (cmdType, tgt, valStr) = if (match != null) {
-                match
-            } else {
-                val parts = trimmed.split(":", limit = 3)
-                val cmdType = parts.getOrNull(0)?.trim() ?: continue
-                val tgt = parts.getOrNull(1)
-                val valStr = parts.getOrNull(2)
-                Triple(cmdType, tgt, valStr ?: tgt)
-            }
-            
-            AppLog.d("MacroExecutor", "Running macro step: $cmdType, targetPresent=${!tgt.isNullOrBlank()}, valuePresent=${!valStr.isNullOrBlank()}")
-            val res = executeAsync(cmdType, tgt, valStr ?: tgt)
-
-            results.add("$cmdType: $res")
-            kotlinx.coroutines.delay(500)
-        }
-        return "မက်ခရို '$name' ပြီးဆုံးပါပြီ။ ရလဒ်များ- ${results.joinToString(", ")}"
+        val runner = BoundedMacroRunner(
+            // Runner freezes each exact SharedPreferences definition during complete preflight,
+            // then rechecks those captured snapshots before each leaf. No live nested dispatch.
+            lookupDefinition = { id -> macroPrefs.getString(id, null) },
+            classifyRisk = { command ->
+                when (CommandSafetyPolicy.classify(command)) {
+                    CommandSafetyPolicy.Classification.SAFE -> MacroLeafRisk.SAFE
+                    CommandSafetyPolicy.Classification.SENSITIVE -> MacroLeafRisk.SENSITIVE
+                    CommandSafetyPolicy.Classification.UNKNOWN -> MacroLeafRisk.UNKNOWN
+                }
+            },
+            dispatchThroughCommonGuard = { leaf ->
+                OpaqueMacroResults.classify(executeAsync(leaf.command, leaf.target, leaf.value))
+            },
+            monotonicMillis = { android.os.SystemClock.elapsedRealtime() }
+        )
+        return runner.run(name).renderLegacy()
     }
 
     private fun setListeningTimeout(seconds: Int): String {
-        val prefs = SettingsActivity.getSecurePrefs(context)
+        val prefs = SettingsActivity.trySecurePrefs(context) ?: return com.example.voicebrainlive.security.SecureSettingsStorage.ERROR
         prefs.edit().apply {
             putInt(SettingsActivity.KEY_SILENCE_TIMEOUT_VALUE, seconds)
             putString(SettingsActivity.KEY_SILENCE_TIMEOUT_UNIT, "s")

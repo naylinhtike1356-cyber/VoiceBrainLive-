@@ -21,6 +21,7 @@ class RoutineBootReceiver : BroadcastReceiver() {
             intent.action == Intent.ACTION_TIME_CHANGED ||
             intent.action == Intent.ACTION_TIMEZONE_CHANGED) {
             RoutineScheduler.rescheduleAll(context)
+            SleepWakeGraph.restore(context)
             val reminderCount = ReminderHelper.rescheduleAllFuture(context)
             CalendarEventReminderHelper.scheduleUpcoming(context)
             ProactiveRainScheduler.schedule(context)

@@ -370,6 +370,7 @@ object CommandSafetyPolicy {
     }
     fun classify(command: String): Classification = when {
         canonical(command) in sensitive -> Classification.SENSITIVE
+        command.trim().lowercase(Locale.ROOT) in setOf("set_music_sleep_timer", "start_bedtime_music", "cancel_music_sleep_timer", "stop_wake_alarm", "cancel_wake_alarm") -> Classification.SAFE
         command.trim().lowercase(Locale.ROOT) in known -> Classification.SAFE
         else -> Classification.UNKNOWN
     }

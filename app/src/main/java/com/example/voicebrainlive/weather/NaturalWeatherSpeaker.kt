@@ -17,7 +17,7 @@ class NaturalWeatherSpeaker(context: Context) {
     private var ttsUnified: TtsUnifiedInterface? = null
 
     init {
-        initializeTts()
+        if (!com.example.voicebrainlive.voice.AgentSpeech.ENABLED) initializeTts()
         ttsUnified = TtsUnifiedInterface(appContext)
     }
 
@@ -97,6 +97,10 @@ class NaturalWeatherSpeaker(context: Context) {
 
     private fun speak(text: String) {
         if (text.isBlank()) return
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) {
+            ttsUnified?.speakWeather(text)
+            return
+        }
 
         // Track weather speaking duration in TtsUnifiedInterface so silence timeout does not close mid-speech
         com.example.voicebrainlive.tts.TtsUnifiedInterface.externalTtsSpeakingUntil = 

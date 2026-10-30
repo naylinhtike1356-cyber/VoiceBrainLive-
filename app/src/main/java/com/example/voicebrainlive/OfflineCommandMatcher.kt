@@ -6,6 +6,88 @@ package com.example.voicebrainlive
  */
 object OfflineCommandMatcher {
 
+    // Full utterances only: this is the user-input fast path, not fuzzy model/tool authorization.
+    private val directSuffix = Regex("(?:ပေး(?:လိုက်)?(?:ပါ)?(?:ဦး|ဦး|နော်)?|လိုက်(?:ပါ)?|ပါ(?:ဦး|ဦး|နော်)?|ဦး|နော်)$")
+    private val directSpace = Regex("\\s+")
+    private val directPatterns = listOf(
+        Regex("(?:ဓာတ်မီး|ဖုန်းဓာတ်မီး|မီးအိမ်|ဖလက်ရှ်မီး)(?:ကို)?(?:လေး)?(?:ဖွင့်|ထွန်း)") to "turn_on_flashlight",
+        Regex("(?:ဓာတ်မီး|ဖုန်းဓာတ်မီး|မီးအိမ်|ဖလက်ရှ်မီး)(?:ကို)?(?:လေး)?ပိတ်") to "turn_off_flashlight",
+        Regex("(?:အသံ|ဝေါလ်ယမ်|ဗောလျုမ်)(?:ကို)?(?:နည်းနည်း|တစ်ဆင့်|လေး)?(?:လျှော့|လျော့|ချ|တိုးတိုး(?:လေး)?လုပ်|တိုးတိုး(?:လေး)?ထား)") to "volume_down",
+        Regex("(?:အသံ|ဝေါလ်ယမ်|ဗောလျုမ်)(?:ကို)?(?:နည်းနည်း|တစ်ဆင့်|လေး)?(?:တိုး|မြှင့်|ကျယ်|ကျယ်ကျယ်လုပ်|ကျယ်အောင်လုပ်)") to "volume_up",
+        Regex("အသံ(?:ကို)?(?:ခဏ)?ပိတ်") to "mute",
+        Regex("အသံ(?:ကို)?ပြန်ဖွင့်") to "unmute",
+        Regex("(?:သီချင်း|သီးချင်း)(?:ကို)?(?:လေး)?(?:ဖွင့်|ဆက်ဖွင့်|ပြန်ဖွင့်)") to "media_play",
+        Regex("(?:သီချင်း|သီးချင်း)(?:ကို)?(?:ခဏ|ခေတ္တ)?(?:ရပ်|ပိတ်|နား)") to "media_pause",
+        Regex("(?:သီချင်း)?နောက်တစ်ပုဒ်(?:ဖွင့်|ပြောင်း)?") to "media_next",
+        Regex("(?:သီချင်း)?ရှေ့တစ်ပုဒ်(?:ဖွင့်|ပြောင်း)?") to "media_previous"
+    )
+    private val directEnglish = mapOf(
+        "flashlight on" to "turn_on_flashlight", "turn on flashlight" to "turn_on_flashlight",
+        "turn on the flashlight" to "turn_on_flashlight", "torch on" to "turn_on_flashlight",
+        "flashlight off" to "turn_off_flashlight", "turn off the flashlight" to "turn_off_flashlight",
+        "turn off flashlight" to "turn_off_flashlight", "torch off" to "turn_off_flashlight",
+        "volume up" to "volume_up", "louder" to "volume_up", "volume down" to "volume_down",
+        "quieter" to "volume_down", "mute" to "mute", "unmute" to "unmute",
+        "play" to "media_play", "play music" to "media_play", "resume music" to "media_play",
+        "pause" to "media_pause", "pause music" to "media_pause", "stop music" to "media_stop",
+        "stop" to "media_stop", "next track" to "media_next", "previous track" to "media_previous"
+    )
+    private val directApps = mapOf(
+        "spotify" to "spotify", "စပေါ့တီဖိုင်း" to "spotify", "youtube" to "youtube", "ယူကျူ့" to "youtube",
+        "ယူကျု" to "youtube", "ယူကျုပ်" to "youtube", "youtube music" to "youtube music",
+        "telegram" to "telegram", "တယ်လီဂရမ်" to "telegram", "facebook" to "facebook", "ဖေ့စ်ဘုတ်" to "facebook",
+        "messenger" to "messenger", "မက်ဆင်ဂျာ" to "messenger", "viber" to "viber", "ဗိုက်ဘာ" to "viber",
+        "whatsapp" to "whatsapp", "chrome" to "chrome", "ခရုမ်း" to "chrome", "browser" to "browser",
+        "camera" to "camera", "ကင်မရာ" to "camera", "calculator" to "calculator", "ဂဏန်းတွက်စက်" to "calculator",
+        "settings" to "settings", "ဆက်တင်" to "settings", "clock" to "clock", "နာရီ" to "clock",
+        "notion" to "notion", "နိုရှင်း" to "notion", "gmail" to "gmail", "maps" to "maps",
+        "ပြက္ခဒိန်" to "calendar", "calendar" to "calendar", "gallery" to "gallery", "music" to "music"
+    )
+    private val directVolume = Regex("(?:အသံ(?:ကို)?|volume)([0-9]{1,3})(?:ရာခိုင်နှုန်း|%)?(?:ထား|လုပ်|သတ်မှတ်)?")
+    private val directTimer = Regex("(?:([0-9]{1,4})(?:မိနစ်|minutes?)(?:တိုင်မာ|timer)|(?:တိုင်မာ|timer)([0-9]{1,4})(?:မိနစ်|minutes?))(?:ထား|သတ်မှတ်)?")
+    private val directAlarm = Regex("(?:(မနက်|နံနက်|နေ့လယ်|ညနေ|ည))?([0-9]{1,2})(?:နာရီ(?:([0-9]{1,2})မိနစ်)?|:([0-9]{2}))(?:မှာ|အတွက်)?(?:နူးနူးညံ့ညံ့)?(?:အိပ်ရာထဖို့)?(?:နှိုးစက်|နိုးစက်|အလားမ်|နှိုး)(?:ထား|သတ်မှတ်)?")
+    private val explicitOpen = Regex("(?:open(?: app)?|launch) (.+)")
+    private val forbiddenDirect = Regex("(?:[?？\"“”'‘’]|မဖွင့်|မပိတ်|မလုပ်|မတိုး|မလျှော့|မလျော့|မရပ်|မထား|ဘယ်လို|လား|ရင်|ပြီးတော့|ပြီးရင်|ပြီးလျှင်|နောက်မှ|မနက်ဖြန်|နေ့တိုင်း|အချိန်သတ်မှတ်|နှင့်|နဲ့|၊|;|\\n|\\r|\\b(?:not|don't|do not|if|when|then|and|tomorrow|daily|later)\\b)")
+
+    /** No network, learning, target guessing, partial matching, or sensitive effects. */
+    fun matchDirectAction(text: String): Triple<String, String?, String?>? {
+        com.example.voicebrainlive.routines.SleepWakePhrases.match(text)?.let { return it }
+        if (text.length !in 1..240) return null
+        var s = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFC)
+            .lowercase(java.util.Locale.ROOT).replace("\u200b", "").replace("\ufeff", "").trim()
+        if (forbiddenDirect.containsMatchIn(s)) return null
+        s = directSpace.replace(s, " ").trimEnd('။', '.', '!').trim()
+            .removePrefix("ကျေးဇူးပြုပြီး").removePrefix("please ").trim()
+        s = s.replace(directSuffix, "").trim()
+        directEnglish[s]?.let { return Triple(it, null, null) }
+        val compact = s.replace(" ", "")
+        directPatterns.firstOrNull { it.first.matches(compact) }?.let { return Triple(it.second, null, null) }
+        val digits = compact.map { if (it in '၀'..'၉') '0' + (it - '၀') else it }.joinToString("")
+        directVolume.matchEntire(digits)?.let {
+            val n = it.groupValues[1].toInt(); return if (n in 0..100) Triple("set_volume", null, n.toString()) else null
+        }
+        directTimer.matchEntire(digits)?.let {
+            val n = (it.groupValues[1].ifBlank { it.groupValues[2] }).toInt()
+            return if (n in 1..1440) Triple("set_timer", null, n.toString()) else null
+        }
+        directAlarm.matchEntire(digits)?.let {
+            val period = it.groupValues[1]; var hour = it.groupValues[2].toInt()
+            val minute = it.groupValues[3].ifBlank { it.groupValues[4] }.ifBlank { "0" }.toInt()
+            if (minute !in 0..59 || hour !in 0..23) return null
+            if (period.isNotBlank()) {
+                if (hour !in 1..12) return null
+                hour = hour % 12 + if (period in setOf("နေ့လယ်", "ညနေ", "ည") && !(period == "ည" && hour == 12)) 12 else 0
+            } else if (it.groupValues[4].isBlank()) return Triple("set_alarm", null, null) // Ask for an unambiguous time.
+            return Triple("set_alarm", "%02d:%02d".format(java.util.Locale.ROOT, hour, minute), null)
+        }
+        if (compact in setOf("နှိုးစက်", "နိုးစက်", "နှိုးစက်ထား", "နိုးစက်ထား")) return Triple("set_alarm", null, null)
+        val app = explicitOpen.matchEntire(s)?.groupValues?.get(1)?.trim()
+            ?: if (s.endsWith("ဖွင့်")) s.removeSuffix("ဖွင့်").trim().removeSuffix("ကို").trim()
+                .removeSuffix("app").removeSuffix("အက်ပ်").trim().removeSuffix("ကို").trim() else null
+        directApps[app]?.let { return Triple("open_app", it, null) }
+        return null
+    }
+
     private val KNOWN_COMMANDS = setOf(
         "make_call", "call", "dial", "call_contact", "call_quick_contact", "contact_call",
         "search_phone_contacts", "call_phone_contact", "add_contact", "save_contact",
@@ -426,6 +508,13 @@ object OfflineCommandMatcher {
             val valueParam = rawParts.getOrNull(2)
             return Triple(firstPart, targetParam, valueParam ?: targetParam)
         }
+
+        matchDirectAction(text)?.let { return it }
+        // Full new control utterances must not fall into legacy substring matching on negation,
+        // a schedule, a question or a composite instruction. Raw legacy command contracts stay above.
+        if (text.contains("ဓာတ်မီး") || text.contains("နှိုးစက်") || text.contains("တိုင်မာ") ||
+            forbiddenDirect.containsMatchIn(text.lowercase(java.util.Locale.ROOT)) &&
+            listOf("အသံ", "သီချင်း", "flashlight", "volume", "music").any { text.contains(it, true) }) return null
 
         // Time/date questions FIRST - avoid "နာရီ" matching "ဘယ်နှစ်နာရီလဲ" -> open_app
         when {

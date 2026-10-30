@@ -10,6 +10,10 @@ class ReusableTtsSpeaker(private val context: Context) {
     private var sharedTts: TextToSpeech? = null
 
     fun speak(text: String, utteranceId: String = "reusable_tts") {
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) {
+            com.example.voicebrainlive.voice.AgentSpeech.speak(context, text, this)
+            return
+        }
         if (text.isBlank()) return
 
         val existingTts = sharedTts
@@ -36,10 +40,12 @@ class ReusableTtsSpeaker(private val context: Context) {
     }
 
     fun isSpeaking(): Boolean {
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) return com.example.voicebrainlive.voice.AgentSpeech.isSpeaking
         return sharedTts?.isSpeaking ?: false
     }
 
     fun shutdown() {
+        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) com.example.voicebrainlive.voice.AgentSpeech.stop(this)
         sharedTts?.shutdown()
         sharedTts = null
     }

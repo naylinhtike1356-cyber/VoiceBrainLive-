@@ -33,6 +33,7 @@ class HomeFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        (activity as? InteractiveBetaHost)?.let { return it.betaHomeView() }
         return ComposeView(requireContext()).apply {
             setContent {
                 val uiState by viewModel.uiState.collectAsState(initial = AssistantState.Idle)

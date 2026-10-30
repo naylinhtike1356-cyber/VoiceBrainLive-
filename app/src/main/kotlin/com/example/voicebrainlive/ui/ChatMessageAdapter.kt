@@ -21,7 +21,8 @@ import java.util.Locale
  */
 class ChatMessageAdapter(
     private val onCopyMessage: (String) -> Unit = {},
-    private val onShareMessage: (String) -> Unit = {}
+    private val onShareMessage: (String) -> Unit = {},
+    private val allowTransfer: Boolean = true
 ) : ListAdapter<ChatMessage, RecyclerView.ViewHolder>(ChatMessageDiffCallback()) {
 
     private val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -46,6 +47,9 @@ class ChatMessageAdapter(
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        listOf(R.id.btnUserCopy, R.id.btnUserShare, R.id.btnAssistantCopy, R.id.btnAssistantShare).forEach { id ->
+            holder.itemView.findViewById<View>(id)?.visibility = if (allowTransfer) View.VISIBLE else View.GONE
+        }
         when (holder) {
             is UserMessageViewHolder -> holder.bind(getItem(position))
             is AssistantMessageViewHolder -> holder.bind(getItem(position))

@@ -154,17 +154,17 @@ class WakeWordListenerService : Service(), SensorEventListener {
 
                     }
                 }
-                                        override fun onResults(results: Bundle?) {
-                            recognitionSessionActive = false
-                            checkResults(results)
-                            if (wakeHandled) return
+                override fun onResults(results: Bundle?) {
+                    recognitionSessionActive = false
+                    checkResults(results)
+                    if (wakeHandled) return
 
-                                        consecutiveQuietSessions = 0
+                    consecutiveQuietSessions = 0
                     restartDelayMs = 5000L
                     scheduleRestart()
 
                 }
-                                override fun onPartialResults(partialResults: Bundle?) {
+                override fun onPartialResults(partialResults: Bundle?) {
                     // Never trigger from partial recognition.
                 }
 

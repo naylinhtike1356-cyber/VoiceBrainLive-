@@ -1,164 +1,112 @@
 package com.example.voicebrainlive.audio
 
-import android.util.Log
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
-import android.util.Base64
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 import android.os.Process
+import android.util.Base64
 
-/**
- * Plays raw PCM from Gemini Live API. Strict config: 24kHz, MONO, 16-bit.
- * Stream: MUSIC. Includes jitter buffer to prevent choppy audio (underruns).
- */
+/** Bounded worker-owned playback preserving source APIs and PCM/media-volume configuration. */
 class AudioPlayerHelper {
-
     companion object {
         const val SAMPLE_RATE = 24000
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_OUT_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-        private const val BUFFER_SIZE_MULTIPLIER = 8 // Increased for better stability
-        private const val JITTER_BUFFER_THRESHOLD = 4 // Wait for a few chunks before starting
+        internal const val BUFFER_SIZE_MULTIPLIER = 8
     }
 
-    private var audioTrack: AudioTrack? = null
-    private val queue = LinkedBlockingQueue<ByteArray>()
-    private var isPlaying = false
-    private var isActuallyPlaying = false
-
-    private val minBufferSize by lazy {
-        AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-    }
-
-    private val bufferSize by lazy { minBufferSize * BUFFER_SIZE_MULTIPLIER }
-
-    var onError: ((String) -> Unit)? = null
+    @Volatile var onError: ((String) -> Unit)? = null
+    private val controller = BoundedPlaybackController(
+        sinkFactory = { AndroidPcmSink() },
+        onWorkerStart = { try { Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO) } catch (_: Exception) {} },
+        onError = { onError?.invoke("Audio playback error: ${it.name}") }
+    )
 
     fun start() {
-        if (isPlaying) return
-        isPlaying = true
-
-        val audioFormat = AudioFormat.Builder()
-            .setEncoding(AUDIO_FORMAT)
-            .setSampleRate(SAMPLE_RATE)
-            .setChannelMask(CHANNEL_CONFIG)
-            .build()
-
-        val audioAttrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_MEDIA)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build()
-
-        audioTrack = AudioTrack.Builder()
-            .setAudioAttributes(audioAttrs)
-            .setAudioFormat(audioFormat)
-            .setBufferSizeInBytes(bufferSize)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
-
-        if (audioTrack?.state != AudioTrack.STATE_INITIALIZED) {
-            onError?.invoke("AudioTrack initialization failed")
-            isPlaying = false
+        if (controller.start() == BoundedPlaybackController.Start.RETIRING) {
+            onError?.invoke("Audio playback is still stopping; retry when cleanup finishes.")
+        }
+    }
+    fun playBase64(base64Audio: String) {
+        val producer = controller.captureProducer() ?: return
+        playBase64(producer, base64Audio)
+    }
+    internal fun captureProducer(): BoundedPlaybackController.Producer? = controller.captureProducer()
+    internal fun isCurrentProducer(producer: BoundedPlaybackController.Producer): Boolean =
+        controller.current(producer)
+    /** Call only from a current provider callback, before listener/UI/async work. */
+    internal fun captureStartedProducer(): BoundedPlaybackController.Producer? {
+        if (!isPlaying()) start()
+        return captureProducer()
+    }
+    internal fun playBase64(producer: BoundedPlaybackController.Producer, base64Audio: String) {
+        if (!controller.current(producer)) return
+        if (base64Audio.isBlank()) return
+        // Bound decode allocation, including whitespace; base64 transport is normally unwrapped.
+        val maxEncodedChars = ((controller.maxFrameBytes() + 2) / 3) * 4 + 64
+        if (base64Audio.length > maxEncodedChars) {
+            controller.rejectEncodedInput()
+            onError?.invoke("Audio frame exceeds playback limit.")
             return
         }
-        // Do NOT call play() here. It will cause instant underrun.
-        // We will call play() right before writing the first chunk.
-
-        thread(name = "AudioPlaybackPriority") {
-            // Set thread priority to AUDIO to prevent system preemption stutters
-            try {
-                Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
-            } catch (e: Exception) {
-                Log.w("AudioStream", "Could not set priority: ${e.message}")
-            }
-
-            var bufferedCount = 0
-            
-            while (isPlaying) {
-                try {
-                    val chunk = queue.poll(150, TimeUnit.MILLISECONDS)
-                    if (chunk == null) {
-                        isActuallyPlaying = false // Underrun occurred
-                        continue
-                    }
-                    if (chunk.isEmpty()) {
-                        if (!isPlaying) break
-                        continue
-                    }
-
-                    if (!isActuallyPlaying) {
-                        isActuallyPlaying = true
-                        // Added a tiny delay to let Gemini send a couple more chunks into the queue before we begin actual playback.
-                        // This serves as a natural jitter buffer.
-                        Thread.sleep(40)
-                    }
-
-                    val track = audioTrack
-                    if (track != null && track.state == AudioTrack.STATE_INITIALIZED) {
-                        if (track.playState != AudioTrack.PLAYSTATE_PLAYING) {
-                            try {
-                                track.play()
-                            } catch (e: Exception) {
-                                Log.e("AudioStream", "Failed to start AudioTrack: ${e.message}")
-                            }
-                        }
-                        track.write(chunk, 0, chunk.size)
-                    }
-                } catch (e: InterruptedException) {
-                    break
-                } catch (e: Exception) {
-                    Log.e("AudioStream", "Playback error: ${e.message}")
-                }
-            }
-        }
-    }
-
-    fun playBase64(base64Audio: String) {
-        if (base64Audio.isBlank()) return
         try {
-            val audioBytes = Base64.decode(base64Audio, Base64.DEFAULT)
-            if (audioBytes.isEmpty()) return
-            // Ensure even alignment for PCM 16bit
-            val aligned = if (audioBytes.size % 2 != 0) audioBytes.copyOf(audioBytes.size - 1) else audioBytes
-            queue.put(aligned)
-        } catch (e: Exception) {
-            onError?.invoke("Base64 decode error: ${e.message}")
+            playRaw(producer, Base64.decode(base64Audio, Base64.DEFAULT))
+        } catch (_: IllegalArgumentException) {
+            controller.rejectEncodedInput()
+            onError?.invoke("Invalid audio encoding.")
         }
     }
-
     fun playRaw(bytes: ByteArray) {
+        val producer = controller.captureProducer() ?: return
+        playRaw(producer, bytes)
+    }
+    internal fun playRaw(producer: BoundedPlaybackController.Producer, bytes: ByteArray) {
+        if (!controller.current(producer)) return
         if (bytes.isEmpty()) return
+        if (bytes.size > controller.maxFrameBytes()) {
+            controller.offer(producer, bytes) // Queue records rejection without copying.
+            onError?.invoke("Audio frame exceeds playback limit.")
+            return
+        }
+        // Keep the original helper's PCM16 alignment behavior for compatibility.
         val aligned = if (bytes.size % 2 != 0) bytes.copyOf(bytes.size - 1) else bytes
-        queue.put(aligned)
-    }
-
-    fun clearQueue() {
-        queue.clear()
-        isActuallyPlaying = false
-    }
-
-    fun stop() {
-        isPlaying = false
-        isActuallyPlaying = false
-        queue.clear()
-        queue.offer(ByteArray(0)) // Wake up blocked thread
-        try {
-            val track = audioTrack
-            audioTrack = null
-            if (track?.state == AudioTrack.STATE_INITIALIZED) {
-                track.stop()
-            }
-            track?.release()
-        } catch (e: Exception) {
-            Log.e("AudioStream", "Stop error: ${e.message}")
+        if (aligned.isNotEmpty()) {
+            val admission = controller.offer(producer, aligned)
+            if (admission == ByteBoundedPcmQueue.Admission.FULL) onError?.invoke("Audio buffer full; frame dropped.")
         }
     }
+    fun clearQueue() { controller.clear() }
+    fun stop() { controller.stop() }
+    fun isPlaying(): Boolean = controller.isRunning()
+    fun isActuallySpeaking(): Boolean = controller.isSpeaking()
+    internal fun diagnostics(): BoundedPlaybackController.Snapshot = controller.snapshot()
+}
 
-    fun isPlaying(): Boolean = isPlaying
-    
-    /** Returns true if the player is actively writing data to the AudioTrack. */
-    fun isActuallySpeaking(): Boolean = isActuallyPlaying || !queue.isEmpty()
+/** Captured once by worker; never stored in a mutable shared helper field. */
+private class AndroidPcmSink : PcmPlaybackSink {
+    private val track: AudioTrack
+    init {
+        val minimum = AudioTrack.getMinBufferSize(AudioPlayerHelper.SAMPLE_RATE,
+            AudioPlayerHelper.CHANNEL_CONFIG, AudioPlayerHelper.AUDIO_FORMAT)
+        check(minimum > 0) { "Audio buffer unavailable" }
+        val candidate = AudioTrack.Builder()
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioPlayerHelper.AUDIO_FORMAT)
+                .setSampleRate(AudioPlayerHelper.SAMPLE_RATE).setChannelMask(AudioPlayerHelper.CHANNEL_CONFIG).build())
+            .setBufferSizeInBytes(Math.multiplyExact(minimum, AudioPlayerHelper.BUFFER_SIZE_MULTIPLIER))
+            .setTransferMode(AudioTrack.MODE_STREAM).build()
+        if (candidate.state != AudioTrack.STATE_INITIALIZED) {
+            candidate.release()
+            error("Audio track unavailable")
+        }
+        track = candidate
+    }
+    override fun play() { track.play() }
+    override fun write(bytes: ByteArray, offset: Int, count: Int): Int =
+        track.write(bytes, offset, count, AudioTrack.WRITE_NON_BLOCKING)
+    override fun pause() { track.pause() }
+    override fun flush() { track.flush() }
+    override fun stop() { track.stop() }
+    override fun release() { track.release() }
 }

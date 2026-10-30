@@ -12,7 +12,12 @@ import android.widget.ImageButton
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.tabs.TabLayout
+import com.example.voicebrainlive.agent.background.ScheduledRequestsPanel
+import com.example.voicebrainlive.databinding.ActivityMacrosBinding
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.voicebrainlive.databinding.ActivityAutomationBinding
@@ -20,10 +25,14 @@ import com.example.voicebrainlive.routines.RoutineStorage
 import com.example.voicebrainlive.routines.RoutineScheduler
 import java.util.Calendar
 
-class AutomationActivity : ComponentActivity() {
+class AutomationActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAutomationBinding
     private lateinit var adapter: AgentTaskAdapter
+    private lateinit var scheduled: ScheduledRequestsPanel
+    private var macros: MacrosPanel? = null
+    private var selectedTab = 0
+    private var resumed = false
 
     sealed class AgentItem {
         data class Routine(val item: RoutineStorage.RoutineItem) : AgentItem()
@@ -31,7 +40,8 @@ class AutomationActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        ThemeUtils.applyTheme(this)
+        com.example.voicebrainlive.agent.connected.ConnectedUi.theme(this)
+        setTheme(if (ThemeUtils.getTheme(this) == "light") R.style.Theme_VoiceBrainLive_AutomationHub_Light else R.style.Theme_VoiceBrainLive_AutomationHub)
         super.onCreate(savedInstanceState)
         binding = ActivityAutomationBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -42,9 +52,19 @@ class AutomationActivity : ComponentActivity() {
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnAddAutomation.setOnClickListener { showCreateDialog() }
-        binding.btnManageMacros.setOnClickListener {
-            startActivity(android.content.Intent(this, MacrosActivity::class.java))
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
         }
+        ViewCompat.requestApplyInsets(binding.root)
+        scheduled = ScheduledRequestsPanel(this)
+        scheduled.attach(binding.scheduledBody)
+        binding.hubTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) = selectTab(tab.position)
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) { if (resumed) refreshSelectedPanel() }
+        })
 
         adapter = AgentTaskAdapter(
             items = emptyList(),
@@ -66,12 +86,74 @@ class AutomationActivity : ComponentActivity() {
         )
         binding.recyclerAutomation.layoutManager = LinearLayoutManager(this)
         binding.recyclerAutomation.adapter = adapter
-        loadAgentTasks()
+        val restored = savedInstanceState?.getInt("hub_tab", 0)?.coerceIn(0, 2) ?: 0
+        binding.hubTabs.getTabAt(restored)?.select()
+        selectTab(restored)
     }
 
     override fun onResume() {
         super.onResume()
-        loadAgentTasks()
+        resumed = true
+        refreshSelectedPanel()
+    }
+
+    override fun onPause() {
+        resumed = false
+        scheduled.pause()
+        macros?.pause()
+        super.onPause()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("hub_tab", selectedTab)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun selectTab(position: Int) {
+        if (selectedTab != position) {
+            scheduled.pause()
+            macros?.pause()
+            if (android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                android.transition.TransitionManager.beginDelayedTransition(binding.hubContent, android.transition.Fade().setDuration(140))
+            }
+        }
+        selectedTab = position
+        binding.scheduledPanel.visibility = if (position == 0) View.VISIBLE else View.GONE
+        binding.routinesPanel.visibility = if (position == 1) View.VISIBLE else View.GONE
+        binding.macrosPanel.visibility = if (position == 2) View.VISIBLE else View.GONE
+        binding.tvTabHeading.setText(when (position) {
+            0 -> R.string.hub_scheduled_heading
+            1 -> R.string.hub_routines_heading
+            else -> R.string.hub_macros_heading
+        })
+        if (resumed) refreshSelectedPanel()
+    }
+
+    private fun refreshSelectedPanel() {
+        when (selectedTab) {
+            0 -> scheduled.resume()
+            1 -> loadAgentTasks()
+            2 -> {
+                if (macros == null) {
+                    val macroBinding = ActivityMacrosBinding.inflate(layoutInflater, binding.macrosPanel, true)
+                    macroBinding.btnBack.visibility = View.GONE
+                    macros = MacrosPanel(this, macroBinding)
+                    // The hub supplies its own heading and compact actions; the legacy screen retains its voice guide.
+                    macroBinding.macroHeader.getChildAt(1).visibility = View.GONE
+                    macroBinding.btnAddMacro.visibility = View.GONE
+                    macroBinding.layoutVoiceGuide.visibility = View.GONE
+                    val add = com.google.android.material.button.MaterialButton(this).apply {
+                        text = getString(R.string.hub_add_macro)
+                        tag = "hub_macro_add"
+                        isAllCaps = false
+                        minHeight = (48 * resources.displayMetrics.density).toInt()
+                        setOnClickListener { macroBinding.btnAddMacro.performClick() }
+                    }
+                    macroBinding.macroHeader.addView(add, 0, android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                }
+                macros?.loadMacros()
+            }
+        }
     }
 
     private fun loadAgentTasks() {
@@ -235,7 +317,8 @@ class AutomationActivity : ComponentActivity() {
                     musicQuery = musicQuery,
                     reminderText = reminderText,
                     reminderMinutesBefore = reminderMinutesBefore,
-                    enabled = enabled
+                    enabled = enabled,
+                    useLiveAgent = item.useLiveAgent
                 )
                 RoutineScheduler.cancel(this, item.id)
                 RoutineStorage.getById(this, item.id)?.let { RoutineScheduler.schedule(this, it) }
@@ -395,6 +478,7 @@ class AutomationActivity : ComponentActivity() {
             val tvIcon: TextView = view.findViewById(R.id.tvAutomationIcon)
             val tvTitle: TextView = view.findViewById(R.id.tvAutomationTitle)
             val tvTime: TextView = view.findViewById(R.id.tvAutomationTime)
+            val tvStatus: TextView = view.findViewById(R.id.tvAutomationStatus)
             val btnEdit: ImageButton = view.findViewById(R.id.btnEditAutomation)
             val btnDelete: ImageButton = view.findViewById(R.id.btnDeleteAutomation)
             val switchToggle: android.widget.Switch = view.findViewById(R.id.switchAutomationToggle)
@@ -430,6 +514,8 @@ class AutomationActivity : ComponentActivity() {
                     holder.switchToggle.visibility = View.VISIBLE
                     holder.switchToggle.setOnCheckedChangeListener(null)
                     holder.switchToggle.isChecked = r.enabled
+                    holder.switchToggle.contentDescription = holder.tvTitle.text
+                    holder.tvStatus.setText(if (r.enabled) R.string.hub_active else R.string.hub_paused)
                     holder.switchToggle.setOnCheckedChangeListener { _, checked -> onToggle(r, checked) }
                     holder.tvTitle.alpha = if (r.enabled) 1f else 0.5f
                 }
@@ -438,6 +524,7 @@ class AutomationActivity : ComponentActivity() {
                     holder.tvIcon.text = "⏰"
                     holder.tvTitle.text = rem.message
                     holder.tvTime.text = rem.formatTime(ctx)
+                    holder.tvStatus.setText(if (rem.isPast) R.string.hub_completed else R.string.hub_active)
                     holder.btnEdit.visibility = View.GONE
                     holder.switchToggle.visibility = View.GONE
                     holder.tvTitle.alpha = if (rem.isPast) 0.5f else 1f

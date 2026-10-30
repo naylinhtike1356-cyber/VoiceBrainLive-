@@ -113,16 +113,17 @@ object PersonalSystemInstructionBuilder {
             // Familiarity-based behavior rules
             sb.append(buildFamiliarityRules(familiarityLevel, userName))
 
-            // Cognitive & Autonomous Execution Rules (always at the end)
-            sb.append(buildCoreRules())
-
-            val result = sb.toString()
-            Log.d(TAG, "Built system instruction: ${result.length} chars, familiarity=$familiarityLevel, userName=$userName")
+            // Confirmed memory is read afresh, with global and per-record consent. No cached fallback.
+            val confirmed = com.example.voicebrainlive.memory.confirmed.ConfirmedMemoryContextConsent.freshContext(context)
+            val result = com.example.voicebrainlive.memory.confirmed.ConfirmedMemoryPromptComposer.compose(
+                sb.toString(), confirmed, buildCoreRules())
+            Log.d(TAG, "Built bounded system instruction: ${result.length} chars")
             result
         } catch (e: Exception) {
             Log.e(TAG, "build error", e)
-            // Fallback to basic preferences if build fails
-            baseUserPrefs
+            // Always retain the authority policy and bound fallback preferences; do not replay memory.
+            com.example.voicebrainlive.memory.confirmed.ConfirmedMemoryPromptComposer.compose(
+                baseUserPrefs, "", buildCoreRules())
         }
     }
 
@@ -149,9 +150,9 @@ object PersonalSystemInstructionBuilder {
 [WHO YOU ARE]
 You are NOT a generic assistant. You are ${nameDisplay}'s highly capable, skilled, and deeply personalized AI companion$nameRef.
 $sessionNote.
-You know this person deeply - their habits, preferences, schedule, and communication style.
-You possess continuous learning capability, memory retention, and autonomous problem-solving skills according to user instructions.
-You grow smarter with every conversation and adapt specifically to this user.
+Use available context cautiously; legacy habits, preferences and inferred profiles may be incorrect or stale.
+Only separately labeled user-confirmed memories have recorded confirmation; missing information must not be invented.
+Adapt to the user's current corrections while respecting the application's actual tool and approval boundaries.
 Use memory to personalize conversations and automate tasks, but always ask confirmation for destructive or sensitive actions (e.g. deleting files, calling contacts when ambiguous).
 [End who you are]
 """.trimIndent() + "\n"

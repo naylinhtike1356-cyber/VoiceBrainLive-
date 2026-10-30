@@ -136,8 +136,8 @@ class MessagingHandler(
         }
 
         // (2) API (Only if configured for Page)
-        val token = SettingsActivity.getSecurePrefs(context).getString(MessengerApiClient.PREF_MESSENGER_TOKEN, "")
-        val userToken = SettingsActivity.getSecurePrefs(context).getString(MessengerApiClient.PREF_MESSENGER_USER_TOKEN, "")
+        val token = SettingsActivity.trySecurePrefs(context)?.getString(MessengerApiClient.PREF_MESSENGER_TOKEN, "")
+        val userToken = SettingsActivity.trySecurePrefs(context)?.getString(MessengerApiClient.PREF_MESSENGER_USER_TOKEN, "")
         if ((!token.isNullOrBlank() || !userToken.isNullOrBlank()) && !recipientHint.isNullOrBlank()) {
             return messengerApiClient.sendMessageSync(recipientHint, cleanMsg)
         }

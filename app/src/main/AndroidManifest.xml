@@ -40,6 +40,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
@@ -57,6 +58,10 @@
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
     <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+        <intent><action android:name="android.intent.action.SET_ALARM" /></intent>
+        <intent><action android:name="android.intent.action.DISMISS_ALARM" /></intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -86,7 +91,17 @@
         android:roundIcon="@drawable/luma_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.VoiceBrainLive">
+        <activity android:name=".memory.confirmed.ConfirmedMemoryActivity" android:exported="false" />
         <activity android:name=".updates.AppUpdateActivity" android:exported="false" />
+        <activity android:name=".agent.AgentTasksActivity" android:exported="false" />
+        <activity android:name=".agent.brain.AgentActivityInboxActivity" android:exported="false" />
+        <activity android:name=".agent.background.ScheduledAgentTasksActivity" android:exported="false" />
+        <activity android:name=".agent.background.ScheduledRequestsActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".agent.proactive.ProactiveRulesActivity" android:exported="false" />
+        <activity android:name=".agent.notion.NotionProfilesActivity" android:exported="false" />
+        <activity android:name=".agent.connected.ConnectedAgentActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".agent.connected.ConnectedSettingsActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".agent.connected.ConnectedTasksActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         
         <!-- Disable Startup initializers that may crash (ProfileInstaller, EmojiCompat) -->
         <provider
@@ -371,6 +386,15 @@
         </service>
 
 
+
+        <activity android:name=".routines.SleepWakeActivity" android:exported="false" />
+        <activity android:name=".agent.nativeapps.NativeAgentSettingsActivity" android:exported="false" />
+        <activity android:name=".memory.confirmed.MemoryJsonImportActivity" android:exported="false" />
+        <service android:name=".notifications.AgentNotificationAudioService" android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <receiver android:name=".routines.SleepWakeReceiver" android:exported="false" />
+        <service android:name=".routines.WakeAlarmService" android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Routines Engine: scheduled daily tasks (weather, reminder) -->
         <receiver

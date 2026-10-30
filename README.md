@@ -4,9 +4,14 @@ Android voice assistant application (Android 8.0/API 26 or newer).
 
 ## Download
 
-Signed APKs are distributed through this private repository's
+Signed APKs are distributed through this public repository's
 [GitHub releases](https://github.com/naylinhtike1356-cyber/VoiceBrainLive-/releases/latest).
-Sign in with an account that has repository access.
+No GitHub login or token is needed. In the app, open Settings > App updates,
+check for updates, then tap Download & Install and confirm Android's installer.
+
+Voice announcements and wake responses use the agent's native Gemini audio.
+Android TTS is disabled. Agent audio requires an internet connection and the
+Gemini configuration in Settings; GitHub updates need no AI or GitHub credentials.
 
 ## Build
 

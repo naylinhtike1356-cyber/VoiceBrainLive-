@@ -992,8 +992,6 @@ object SpotifyManager {
             val accessToken = json.optString("access_token").takeIf { it.isNotBlank() } ?: return false
             val newRefresh = json.optString("refresh_token").takeIf { it.isNotBlank() } ?: refreshToken
             SettingsActivity.saveSpotifyTokens(context, accessToken, newRefresh)
-            Log.d(TAG, "refreshAccessToken: success")
-            true
         } catch (e: Exception) {
             Log.e(TAG, "refresh token failed: ${e.message}", e)
             false
