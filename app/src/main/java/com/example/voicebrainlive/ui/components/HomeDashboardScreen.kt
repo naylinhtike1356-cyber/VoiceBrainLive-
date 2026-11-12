@@ -32,6 +32,18 @@ data class DashboardItem(
     val onClick: () -> Unit
 )
 
+data class PendingTaskCardModel(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val timeLabel: String,
+    val categoryLabel: String,
+    val statusLabel: String,
+    val icon: String,
+    val isReady: Boolean = false,
+    val type: String = "reminder"
+)
+
 @Composable
 fun HomeDashboardScreen(
     statusText: String,
@@ -45,7 +57,10 @@ fun HomeDashboardScreen(
     onQuickRemember: () -> Unit = {},
     onQuickAutomate: () -> Unit = {},
     onStatusCardClick: () -> Unit = {},
-    dashboardItems: List<DashboardItem>
+    dashboardItems: List<DashboardItem>,
+    pendingTasks: List<PendingTaskCardModel> = emptyList(),
+    onTaskClick: (PendingTaskCardModel) -> Unit = {},
+    onViewAllTasks: () -> Unit = onQuickAutomate
 ) {
     var textInput by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
@@ -332,6 +347,201 @@ fun HomeDashboardScreen(
                             label = "သတိပေးချက် အသစ်လုပ်မယ်",
                             onClick = { onTextSubmit("သတိပေးချက် အသစ်လုပ်မယ်") },
                             modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── 4.5 ACTIVE & PENDING TASKS SECTION (ခိုင်းထားသော အလုပ်များနှင့် လုပ်ဆောင်ရန်များ) ──
+        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "📋 လုပ်ဆောင်ရန် အလုပ်များ",
+                    color = VoiceBrainText,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (pendingTasks.isNotEmpty()) {
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        color = VoiceBrainSecondary.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, VoiceBrainSecondary.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = "${pendingTasks.size} ခု",
+                            color = VoiceBrainSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+            Text(
+                text = "အားလုံးကြည့်ရန် ➔",
+                color = VoiceBrainPrimaryLight,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onViewAllTasks() }
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+
+        if (pendingTasks.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                pendingTasks.take(4).forEach { task ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onTaskClick(task) },
+                        color = VoiceBrainSurface,
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, VoiceBrainCardStroke)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                VoiceBrainPrimary.copy(alpha = 0.25f),
+                                                VoiceBrainSecondary.copy(alpha = 0.25f)
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(task.icon, fontSize = 22.sp)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = task.title,
+                                        color = VoiceBrainText,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        color = VoiceBrainSurfaceSoft,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(0.5.dp, VoiceBrainCardStroke)
+                                    ) {
+                                        Text(
+                                            text = task.categoryLabel,
+                                            color = VoiceBrainSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    text = task.subtitle,
+                                    color = VoiceBrainTextMuted,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "⏰ ${task.timeLabel}",
+                                        color = VoiceBrainWarning,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "•",
+                                        color = VoiceBrainTextMuted,
+                                        fontSize = 11.sp
+                                    )
+                                    Text(
+                                        text = "⚡ ${task.statusLabel}",
+                                        color = VoiceBrainSuccess,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Friendly Empty State Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { onViewAllTasks() },
+                color = VoiceBrainSurfaceSoft.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, VoiceBrainCardStroke.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("📝", fontSize = 28.sp)
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "လက်ရှိ ခိုင်းထားသော အလုပ် မရှိသေးပါ",
+                            color = VoiceBrainText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "အသံဖြင့် 'မနက် ၇ နာရီ နှိုးစက်ထားပေး' ဟု ခိုင်းနိုင်သည်",
+                            color = VoiceBrainTextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Surface(
+                        color = VoiceBrainPrimary.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, VoiceBrainPrimary.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = "+ အလုပ်သစ်",
+                            color = VoiceBrainPrimaryLight,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         )
                     }
                 }

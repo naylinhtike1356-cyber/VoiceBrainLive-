@@ -5,20 +5,26 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
+import com.example.voicebrainlive.MainActivity
 
 /**
- * When routine alarm fires: start RoutineSpeakerService to fetch weather / speak message.
+ * When routine alarm fires: start RoutineSpeakerService to execute actions / speak message.
  */
 class RoutineReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_ROUTINE && intent.action != ACTION_ROUTINE_PRE) return
 
-        val id = intent.getIntExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ID, -1)
-        val type = intent.getStringExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_TYPE) ?: "reminder"
-        val message = intent.getStringExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MESSAGE) ?: ""
-        val musicQuery = intent.getStringExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY) ?: ""
-        val reminderText = intent.getStringExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT) ?: ""
+        val id = intent.getIntExtra(MainActivity.EXTRA_AUTOMATION_ID, -1)
+        val type = intent.getStringExtra(MainActivity.EXTRA_AUTOMATION_TYPE) ?: "reminder"
+        val message = intent.getStringExtra(MainActivity.EXTRA_AUTOMATION_MESSAGE) ?: ""
+        val musicQuery = intent.getStringExtra(MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY) ?: ""
+        val reminderText = intent.getStringExtra(MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT) ?: ""
+        val routineName = intent.getStringExtra("extra_automation_name") ?: ""
+        val ringerMode = intent.getStringExtra("extra_automation_ringer_mode") ?: ""
+        val volumePercent = intent.getIntExtra("extra_automation_volume_percent", -1)
+        val sleepTimerMinutes = intent.getIntExtra("extra_automation_sleep_timer_minutes", 0)
+        val actionsSequence = intent.getStringExtra("extra_automation_actions_sequence") ?: ""
         
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(
@@ -29,29 +35,53 @@ class RoutineReceiver : BroadcastReceiver() {
 
         try {
             val isPre = intent.action == ACTION_ROUTINE_PRE
-            val shouldSpeak = intent.getBooleanExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_SPEAK, true)
-            val announceText = intent.getStringExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ANNOUNCE).orEmpty().ifBlank {
+            val shouldSpeak = intent.getBooleanExtra(MainActivity.EXTRA_AUTOMATION_SPEAK, true)
+            val announceText = intent.getStringExtra(MainActivity.EXTRA_AUTOMATION_ANNOUNCE).orEmpty().ifBlank {
                 com.example.voicebrainlive.usecases.AssistantAutomationPayload.buildCalmAnnounce(type, message, musicQuery, isPre)
             }
 
             // Speak in background via RoutineSpeakerService without forcing MainActivity to pop up full-screen
             val serviceIntent = Intent(context, RoutineSpeakerService::class.java).apply {
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ID, id)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_TYPE, type)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MESSAGE, message)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY, musicQuery)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT, reminderText)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ANNOUNCE, announceText)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_IS_PRE, isPre)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_SPEAK, shouldSpeak)
+                putExtra(MainActivity.EXTRA_AUTOMATION_ID, id)
+                putExtra(MainActivity.EXTRA_AUTOMATION_TYPE, type)
+                putExtra(MainActivity.EXTRA_AUTOMATION_MESSAGE, message)
+                putExtra(MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY, musicQuery)
+                putExtra(MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT, reminderText)
+                putExtra(MainActivity.EXTRA_AUTOMATION_ANNOUNCE, announceText)
+                putExtra(MainActivity.EXTRA_AUTOMATION_IS_PRE, isPre)
+                putExtra(MainActivity.EXTRA_AUTOMATION_SPEAK, shouldSpeak)
+                putExtra("extra_automation_name", routineName)
+                putExtra("extra_automation_ringer_mode", ringerMode)
+                putExtra("extra_automation_volume_percent", volumePercent)
+                putExtra("extra_automation_sleep_timer_minutes", sleepTimerMinutes)
+                putExtra("extra_automation_actions_sequence", actionsSequence)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)
             } else {
                 context.startService(serviceIntent)
             }
+        } catch (blocked: IllegalStateException) {
+            // Android 12+ may reject an inexact alarm's background FGS start.
+            onStartBlocked(context, id, intent.action == ACTION_ROUTINE_PRE)
+        } catch (blocked: SecurityException) {
+            onStartBlocked(context, id, intent.action == ACTION_ROUTINE_PRE)
         } finally {
             if (wakeLock.isHeld) wakeLock.release()
+        }
+    }
+
+    private fun onStartBlocked(context: Context, id: Int, isPre: Boolean) {
+        android.util.Log.w("RoutineReceiver", "Routine start blocked; user review required")
+        com.example.voicebrainlive.voice.AgentSpeech.showOpenNotification(context)
+        // The service normally schedules tomorrow. If it never starts, preserve recurrence
+        // without replaying today's possibly sensitive action or claiming success.
+        if (!isPre) {
+            try {
+                RoutineStorage.getById(context, id)?.let { RoutineScheduler.schedule(context, it) }
+            } catch (_: RuntimeException) {
+                android.util.Log.w("RoutineReceiver", "Could not schedule next routine occurrence")
+            }
         }
     }
 

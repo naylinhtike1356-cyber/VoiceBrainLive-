@@ -7,9 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -27,7 +25,8 @@ import kotlin.coroutines.suspendCoroutine
 
 /**
  * Foreground service: agent-style scheduled automation.
- * Supports silent direct execution (လုပ်ဆောင်ရုံနဲ့ပြီး) and serene, calm announcements (အေးဆေးတည်ငြိမ်စွာ အသိပေးပြောကြားခြင်း).
+ * Supports silent direct execution, serene calm background announcements via playback-only TTS,
+ * and multi-action pipelines for Samsung Modes & Routines.
  */
 class RoutineSpeakerService : Service() {
 
@@ -45,6 +44,11 @@ class RoutineSpeakerService : Service() {
         val reminderText = intent.getStringExtra(MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT) ?: ""
         val isPre = intent.getBooleanExtra(MainActivity.EXTRA_AUTOMATION_IS_PRE, false)
         val shouldSpeak = intent.getBooleanExtra(MainActivity.EXTRA_AUTOMATION_SPEAK, true)
+        val routineName = intent.getStringExtra("extra_automation_name") ?: ""
+        val ringerMode = intent.getStringExtra("extra_automation_ringer_mode") ?: ""
+        val volumePercent = intent.getIntExtra("extra_automation_volume_percent", -1)
+        val sleepTimerMinutes = intent.getIntExtra("extra_automation_sleep_timer_minutes", 0)
+        val actionsSequence = intent.getStringExtra("extra_automation_actions_sequence") ?: ""
 
         if (!AutomationExecutionLedger.tryClaim(this, id, type, isPre)) {
             Log.i(TAG, "Skipping duplicate routine trigger id=$id type=$type isPre=$isPre")
@@ -61,7 +65,7 @@ class RoutineSpeakerService : Service() {
             ""
         }
 
-        Log.d(TAG, "Triggered id=$id type=$type isPre=$isPre shouldSpeak=$shouldSpeak")
+        Log.d(TAG, "Triggered id=$id type=$type isPre=$isPre shouldSpeak=$shouldSpeak routineName=$routineName")
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         serviceWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VoiceBrain:RoutineSpeakerServiceWakeLock").apply {
@@ -93,6 +97,7 @@ class RoutineSpeakerService : Service() {
         createChannel(channelId, NotificationManager.IMPORTANCE_HIGH)
 
         val notifText = when {
+            routineName.isNotBlank() -> "လုပ်ဆောင်နေသည်: $routineName"
             announce.isNotBlank() -> announce
             !shouldSpeak -> if (message.isNotBlank()) "အသံတိတ် ဆောင်ရွက်နေသည်: $message" else "အလိုအလျောက် ဆောင်ရွက်နေသည်"
             else -> "အလိုအလျောက် လုပ်ဆောင်ချက်"
@@ -123,7 +128,11 @@ class RoutineSpeakerService : Service() {
                             type = type,
                             message = message,
                             musicQuery = musicQuery,
-                            isPreReminder = false
+                            isPreReminder = false,
+                            ringerMode = ringerMode,
+                            volumePercent = volumePercent,
+                            sleepTimerMinutes = sleepTimerMinutes,
+                            actionsSequence = actionsSequence
                         )
                     }
                     if (shouldSpeak && shouldSpeakResult(type, result, announce)) {
@@ -155,7 +164,7 @@ class RoutineSpeakerService : Service() {
         if (result.isBlank()) return false
         if (result == announce) return false
         // Avoid speaking over music playback
-        if (type.lowercase() in setOf("music", "play_music", "play_spotify")) return false
+        if (type.lowercase() in setOf("music", "play_music", "play_spotify", "bedtime", "sleep")) return false
         if (result.startsWith("Error", ignoreCase = true)) return true
         // Speak informational narratives (weather, daily log, health briefing)
         if (type.lowercase() in setOf("weather", "get_weather", "daily_log", "health", "routine_health", "get_health_summary")) return true
@@ -167,32 +176,10 @@ class RoutineSpeakerService : Service() {
         if (text.isBlank()) return
         suspendCoroutine { cont ->
             val tts = TtsUnifiedInterface(this)
-            val handler = Handler(Looper.getMainLooper())
-            var checkCount = 0
-            val checkRunnable = object : Runnable {
-                override fun run() {
-                    if (tts.isAvailable()) {
-                        tts.setOnSpeakingComplete {
-                            tts.shutdown()
-                            cont.resume(Unit)
-                        }
-                        if (isCalm) {
-                            tts.speakCalm(text) // Speaks with calm, serene Burmese voice settings
-                        } else {
-                            tts.speak(text)
-                        }
-                    } else {
-                        checkCount++
-                        if (checkCount < 100) { // Timeout after 5 seconds
-                            handler.postDelayed(this, 50)
-                        } else {
-                            tts.shutdown()
-                            cont.resume(Unit)
-                        }
-                    }
-                }
+            tts.speakLocalDirect(text, isCalm = isCalm) {
+                tts.shutdown()
+                cont.resume(Unit)
             }
-            handler.post(checkRunnable)
         }
     }
 

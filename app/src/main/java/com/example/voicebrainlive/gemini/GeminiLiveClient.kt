@@ -362,6 +362,11 @@ class GeminiLiveClient(
                                 |  * If the result indicates FAILED, error, or blocked: DO NOT claim "ပို့ပေးလိုက်ပါပြီ"! Inform the user honestly in Burmese (e.g. "စာပို့မရပါခင်ဗျာ" or explain the reason returned by the tool).
                                 |- If the user remains silent, says "ရပြီ", "မလိုဘူး", "ပိတ်တော့", "တော်ပြီ", "မပို့နဲ့", or does not explicitly command a reply, DO NOT call any messaging tools! Stay completely silent and quiet.
                                 |
+                                |ANTI-HALLUCINATION & ANTI-NOISE RULES:
+                                |- ONLY speak or execute actions when the user explicitly addresses you (Voice Brain).
+                                |- NEVER respond to background noise, ambient room conversations, TV audio, or unclear whispers. If speech is ambient or not addressed to you, STAY COMPLETELY SILENT.
+                                |- NEVER execute any tool or command unprompted. ONLY call tools that the user directly and explicitly asked for.
+                                |
                                 |WEATHER: ALWAYS use get_weather.
                                 |REMINDERS/SALARY/CALENDAR: Use tools.
                                 |SMART GEM: switch_gem based on task.
@@ -973,7 +978,8 @@ class GeminiLiveClient(
         if (com.example.voicebrainlive.routines.SleepWakePhrases.blocksClockTimer(call.musicSleepRecipe, plan.intent))
             return "BLOCKED: သီချင်းပိတ်ချိန်အတွက် set_music_sleep_timer သို့မဟုတ် start_bedtime_music ကိုသာ သုံးပါ။ နှိုးစက်/သတိပေးချက်အဖြစ် မထားပါ။"
         if (com.example.voicebrainlive.routines.SleepWakePhrases.requiresUserRecipe(plan.intent) &&
-            !com.example.voicebrainlive.routines.SleepWakePhrases.matchesUserRecipe(call.musicSleepRecipe, plan.intent, plan.target, plan.value))
+            (call.musicSleepRecipe == null ||
+             !com.example.voicebrainlive.routines.SleepWakePhrases.matchesUserRecipe(call.musicSleepRecipe, plan.intent, plan.target, plan.value)))
             return "BLOCKED: နှိုးစက် သို့မဟုတ် သီချင်းပိတ်ချိန်ကို အသုံးပြုသူက အချိန်အတိအကျ ပြောထားရန် လိုပါသည်။ ပြန်မေးပါ။"
         val validation = com.example.voicebrainlive.commands.CommandPlanValidator.validate(plan)
         voiceMetrics.duration(epoch, VoiceSessionMetrics.Work.TOOL_PREPARATION, (System.nanoTime() - preparationStart).coerceAtLeast(0))

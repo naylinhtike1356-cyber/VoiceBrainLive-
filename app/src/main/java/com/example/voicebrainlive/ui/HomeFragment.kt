@@ -53,12 +53,23 @@ class HomeFragment : Fragment() {
                     powerManager?.isIgnoringBatteryOptimizations(requireContext().packageName) != true
                 } else true
 
+                val pendingTasks = remember(uiState) { loadPendingTasks(requireContext()) }
+
                 HomeDashboardScreen(
                     statusText = statusMessage,
                     transcriptText = transcript,
                     voiceStatus = voiceStatus,
                     wakeWordActive = isWakeActive,
                     batteryOptimized = isBatteryOptimized,
+                    pendingTasks = pendingTasks,
+                    onTaskClick = { task ->
+                        performHaptic()
+                        startActivity(Intent(context, AutomationActivity::class.java))
+                    },
+                    onViewAllTasks = {
+                        performHaptic()
+                        startActivity(Intent(context, AutomationActivity::class.java))
+                    },
                     onMicClick = {
                         performHaptic()
                         if (!NetworkUtils.isOnline(requireContext()) || !viewModel.hasUsableGeminiApiKey()) {
@@ -122,6 +133,67 @@ class HomeFragment : Fragment() {
 
     private fun performHaptic() {
         view?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+    }
+
+    private fun loadPendingTasks(context: Context): List<com.example.voicebrainlive.ui.components.PendingTaskCardModel> {
+        val list = mutableListOf<com.example.voicebrainlive.ui.components.PendingTaskCardModel>()
+        try {
+            // 1. Reminders
+            val reminders = ReminderHelper.getReminders(context)
+                .filter { !it.isPast }
+                .sortedBy { it.triggerTime }
+            reminders.take(4).forEach { r ->
+                list.add(
+                    com.example.voicebrainlive.ui.components.PendingTaskCardModel(
+                        id = "rem_${r.id}",
+                        title = r.message.ifBlank { "သတိပေးချက်" },
+                        subtitle = "အချိန်ရောက်လျှင် သတိပေးချက် အသံထွက်မည်",
+                        timeLabel = r.formatTime(context),
+                        categoryLabel = "သတိပေးချက်",
+                        statusLabel = "အချိန်စောင့်ဆိုင်းဆဲ",
+                        icon = "⏰",
+                        type = "reminder"
+                    )
+                )
+            }
+
+            // 2. Active Routines
+            val routines = com.example.voicebrainlive.routines.RoutineStorage.getAll(context)
+                .filter { it.enabled }
+                .sortedBy { com.example.voicebrainlive.routines.RoutineScheduler.nextTriggerTime(it.hour, it.minute, it.dayOfWeek) }
+            routines.take(3).forEach { rt ->
+                val nextTime = com.example.voicebrainlive.routines.RoutineScheduler.nextTriggerTime(rt.hour, rt.minute, rt.dayOfWeek)
+                val diffMin = ((nextTime - System.currentTimeMillis()) / 60_000).coerceAtLeast(0)
+                val timeStr = if (diffMin < 60) "နောက် $diffMin မိနစ်တွင်" else rt.timeLabel()
+                val icon = when (rt.type) {
+                    "weather" -> "🌤️"
+                    "music" -> "🎵"
+                    "daily_log" -> "📊"
+                    else -> "⚙️"
+                }
+                val title = when (rt.type) {
+                    "weather" -> "ရာသီဥတု သတင်း ရူတင်း"
+                    "music" -> if (rt.musicQuery.isNotBlank()) "သီချင်း: ${rt.musicQuery}" else "သီချင်း ရူတင်း"
+                    "daily_log" -> "လစာမှတ်တမ်း စစ်ဆေးမှု"
+                    else -> rt.message.ifBlank { "ပုံမှန် ရူတင်း" }
+                }
+                list.add(
+                    com.example.voicebrainlive.ui.components.PendingTaskCardModel(
+                        id = "rt_${rt.id}",
+                        title = title,
+                        subtitle = "အလိုအလျောက် ဆောင်ရွက်မည့် အစီအစဉ်",
+                        timeLabel = timeStr,
+                        categoryLabel = "ရူတင်း",
+                        statusLabel = "သတ်မှတ်ထားသည်",
+                        icon = icon,
+                        type = "routine"
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("HomeFragment", "loadPendingTasks", e)
+        }
+        return list
     }
 
     private fun openNotionDatabase() {

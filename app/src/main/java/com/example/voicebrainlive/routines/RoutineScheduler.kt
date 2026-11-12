@@ -5,10 +5,12 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.example.voicebrainlive.MainActivity
 import java.util.Calendar
 
 /**
- * Schedules routine alarms via AlarmManager. Daily recurring.
+ * Schedules routine alarms via AlarmManager.
+ * Supports daily, weekly, and custom multi-day schedules (e.g. Weekdays, Weekends, Mon/Wed/Fri).
  */
 object RoutineScheduler {
 
@@ -20,15 +22,22 @@ object RoutineScheduler {
             cancel(context, item.id)
             return
         }
-        val triggerTime = nextTriggerTime(item.hour, item.minute, item.dayOfWeek)
+        // Replacing a schedule must retire its old pre-reminder, including when it was removed.
+        cancel(context, item.id)
+        val triggerTime = nextTriggerTime(item.hour, item.minute, item.repeatDays, item.dayOfWeek)
         val intent = Intent(context, RoutineReceiver::class.java).apply {
             action = RoutineReceiver.ACTION_ROUTINE
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ID, item.id)
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_TYPE, item.type)
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MESSAGE, item.message)
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY, item.musicQuery)
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT, item.reminderText)
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_SPEAK, item.useLiveAgent)
+            putExtra(MainActivity.EXTRA_AUTOMATION_ID, item.id)
+            putExtra(MainActivity.EXTRA_AUTOMATION_TYPE, item.type)
+            putExtra(MainActivity.EXTRA_AUTOMATION_MESSAGE, item.message)
+            putExtra(MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY, item.musicQuery)
+            putExtra(MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT, item.reminderText)
+            putExtra(MainActivity.EXTRA_AUTOMATION_SPEAK, item.useLiveAgent)
+            putExtra("extra_automation_name", item.name)
+            putExtra("extra_automation_ringer_mode", item.ringerMode)
+            putExtra("extra_automation_volume_percent", item.volumePercent)
+            putExtra("extra_automation_sleep_timer_minutes", item.sleepTimerMinutes)
+            putExtra("extra_automation_actions_sequence", item.actionsSequence)
         }
         val pending = PendingIntent.getBroadcast(
             context, REQUEST_CODE_BASE + item.id, intent,
@@ -45,7 +54,7 @@ object RoutineScheduler {
             } else {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pending)
             }
-            android.util.Log.d("RoutineScheduler", "scheduled id=${item.id} at ${item.hour}:${item.minute}")
+            android.util.Log.d("RoutineScheduler", "scheduled id=${item.id} at ${item.hour}:${item.minute} trigger=${triggerTime}")
         } catch (e: Exception) {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pending)
         }
@@ -55,11 +64,11 @@ object RoutineScheduler {
             val preTime = (triggerTime - item.reminderMinutesBefore * 60_000L).coerceAtLeast(System.currentTimeMillis() + 1_000L)
             val preIntent = Intent(context, RoutineReceiver::class.java).apply {
                 action = RoutineReceiver.ACTION_ROUTINE_PRE
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ID, item.id)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_TYPE, item.type)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MESSAGE, item.message)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY, item.musicQuery)
-                putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT, item.reminderText)
+                putExtra(MainActivity.EXTRA_AUTOMATION_ID, item.id)
+                putExtra(MainActivity.EXTRA_AUTOMATION_TYPE, item.type)
+                putExtra(MainActivity.EXTRA_AUTOMATION_MESSAGE, item.message)
+                putExtra(MainActivity.EXTRA_AUTOMATION_MUSIC_QUERY, item.musicQuery)
+                putExtra(MainActivity.EXTRA_AUTOMATION_REMINDER_TEXT, item.reminderText)
             }
             val prePending = PendingIntent.getBroadcast(
                 context, REQUEST_CODE_PRE_BASE + item.id, preIntent,
@@ -84,7 +93,7 @@ object RoutineScheduler {
     fun cancel(context: Context, id: Int) {
         val intent = Intent(context, RoutineReceiver::class.java).apply {
             action = RoutineReceiver.ACTION_ROUTINE
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ID, id)
+            putExtra(MainActivity.EXTRA_AUTOMATION_ID, id)
         }
         val pending = PendingIntent.getBroadcast(
             context, REQUEST_CODE_BASE + id, intent,
@@ -95,7 +104,7 @@ object RoutineScheduler {
 
         val preIntent = Intent(context, RoutineReceiver::class.java).apply {
             action = RoutineReceiver.ACTION_ROUTINE_PRE
-            putExtra(com.example.voicebrainlive.MainActivity.EXTRA_AUTOMATION_ID, id)
+            putExtra(MainActivity.EXTRA_AUTOMATION_ID, id)
         }
         val prePending = PendingIntent.getBroadcast(
             context, REQUEST_CODE_PRE_BASE + id, preIntent,
@@ -112,7 +121,7 @@ object RoutineScheduler {
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
         if (dayOfWeek in 1..7) {
-            var currentDow = cal.get(Calendar.DAY_OF_WEEK)
+            val currentDow = cal.get(Calendar.DAY_OF_WEEK)
             var daysToAdd = dayOfWeek - currentDow
             if (daysToAdd < 0 || (daysToAdd == 0 && cal.timeInMillis <= System.currentTimeMillis())) {
                 daysToAdd += 7
@@ -122,6 +131,22 @@ object RoutineScheduler {
             cal.add(Calendar.DAY_OF_YEAR, 1)
         }
         return cal.timeInMillis
+    }
+
+    /**
+     * Calculates the nearest upcoming trigger time across multiple repeat days.
+     * repeatDays: list of Calendar.SUNDAY..SATURDAY (1..7).
+     * If repeatDays is empty, falls back to single dayOfWeek or daily.
+     */
+    fun nextTriggerTime(hour: Int, minute: Int, repeatDays: List<Int>, fallbackDow: Int = 0): Long {
+        val validDays = repeatDays.filter { it in 1..7 }
+        if (validDays.isEmpty()) {
+            return nextTriggerTime(hour, minute, fallbackDow)
+        }
+        val now = System.currentTimeMillis()
+        return validDays.map { dow -> nextTriggerTime(hour, minute, dow) }
+            .filter { it > now }
+            .minOrNull() ?: nextTriggerTime(hour, minute, validDays.first())
     }
 
     fun rescheduleAll(context: Context) {

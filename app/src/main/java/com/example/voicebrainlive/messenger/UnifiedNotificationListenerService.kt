@@ -263,8 +263,11 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
                 Log.d(TAG, "Launched Pyit Tine Htaung AI Mascot Overlay session for '$appLabel' ($sender)")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Android blocked the native agent overlay")
+            Log.w(TAG, "Android blocked the native agent overlay: ${e.message}")
             showAgentOpenNotification()
+            if (fallbackText.isNotBlank()) {
+                speakOut(fallbackText)
+            }
         }
     }
 
@@ -274,34 +277,14 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
     }
 
     private fun speakOut(text: String) {
-        if (com.example.voicebrainlive.voice.AgentSpeech.ENABLED) return
-        if (!isTtsReady || tts == null) {
-            initTts()
-            return
-        }
-        tts?.stop()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "msg_announce")
-        } else {
-            @Suppress("DEPRECATION")
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
-        }
-        Log.d(TAG, "TTS speaking: ${text.take(80)}")
+        if (text.isBlank()) return
+        val ttsHelper = com.example.voicebrainlive.tts.TtsUnifiedInterface(this)
+        ttsHelper.speakLocalDirect(text, isCalm = true)
+        Log.d(TAG, "Playback TTS speaking: ${text.take(80)}")
     }
 
     private fun showAgentOpenNotification() {
-        val manager = getSystemService(android.app.NotificationManager::class.java)
-        val channel = "agent_open_required"
-        manager.createNotificationChannel(android.app.NotificationChannel(channel, "Agent အသိပေးချက်", android.app.NotificationManager.IMPORTANCE_DEFAULT))
-        val open = android.app.PendingIntent.getActivity(this, 0,
-            Intent(this, com.example.voicebrainlive.AssistantActivity::class.java),
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
-        try {
-            manager.notify(94640, androidx.core.app.NotificationCompat.Builder(this, channel)
-                .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Agent ကို ဖွင့်ရန် နှိပ်ပါ")
-                .setContentText("Android က နောက်ခံမှ စတင်ခွင့်မပေးပါ။")
-                .setContentIntent(open).setAutoCancel(true).build())
-        } catch (_: SecurityException) { /* Notification permission can be revoked. */ }
+        com.example.voicebrainlive.voice.AgentSpeech.showOpenNotification(this)
     }
 
     private fun sendNotificationBroadcast(sender: String, message: String, packageName: String) {

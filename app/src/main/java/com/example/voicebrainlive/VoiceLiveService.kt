@@ -394,7 +394,7 @@ class VoiceLiveService : Service() {
         audioRecorder = AudioRecorderHelper().apply {
             useVoiceCommunicationForNoisyEnv = SettingsActivity.isNoisyEnvMode(this@VoiceLiveService)
         }
-        audioPlayer = AudioPlayerHelper().apply {
+        audioPlayer = AudioPlayerHelper(trackResponse = true).apply {
             onError = { message ->
                 serviceScope.launch(Dispatchers.Main) {
                     currentStatusText = message
@@ -828,6 +828,7 @@ class VoiceLiveService : Service() {
         }
 
         client.onTurnComplete = {
+            audioPlayer?.finishResponse()
             val completedSpeech = agentSpeechTicket
             val speechHadAudio = agentSpeechHadAudio
             cancelledAgentSpeech = false
@@ -1013,9 +1014,7 @@ class VoiceLiveService : Service() {
         if (focusUnavailableForTurn) return@synchronized false
         if (isFirstAudioChunkOfTurn) {
             if (!AudioFocusHelper.requestForSpeech(this, player)) {
-                focusUnavailableForTurn = true
-                player.onError?.invoke("Audio focus unavailable; text response remains available.")
-                return@synchronized false
+                Log.w(TAG, "AudioFocus not granted; continuing audio playback")
             }
             isFirstAudioChunkOfTurn = false
         }
@@ -1067,20 +1066,22 @@ class VoiceLiveService : Service() {
 
     fun sendTextInput(text: String) {
         currentUserInput = if (com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) "ခေါ်ဆိုရန် အတည်ပြုချက်" else "⌨️ $text"
-        if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) {
+        if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
             // This method receives direct user text, never model/proactive tool-result text.
             val executor = phoneExecutor ?: PhoneCommandExecutor(this).also { phoneExecutor = it }
             serviceScope.launch {
                 val result = com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
+                    { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync)
                 if (result != null) {
                     if (phoneExecutor !== executor || !serviceJob.isActive) return@launch
                     geminiClient?.invalidateAgentContext()
-                    lastTranscriptText = result
-                    currentStatusText = result
-                    VoiceLiveServiceManager.listener?.onTranscript(result)
-                    com.example.voicebrainlive.commands.ChatUiBridge.notifyAssistant(result)
+                    val display = com.example.voicebrainlive.commands.CommandResultFormatter.format(result)
+                    lastTranscriptText = display
+                    currentStatusText = display
+                    VoiceLiveServiceManager.listener?.onTranscript(display)
+                    com.example.voicebrainlive.commands.ChatUiBridge.notifyAssistant(display)
                     updateOverlayUi()
                 } else {
                     geminiClient?.sendConversationInput(text)

@@ -31,6 +31,7 @@
             android:orientation="vertical"
             android:layout_weight="1"
             android:maxWidth="280dp"
+            android:background="@drawable/bg_chat_assistant"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:paddingTop="12dp"

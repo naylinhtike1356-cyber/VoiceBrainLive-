@@ -7,6 +7,33 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class ByteBoundedPcmQueueTest {
+    @Test fun replacementWakesPrebufferAndCannotLeakCancelledSpeech() {
+        val queue = ByteBoundedPcmQueue(16)
+        val old = queue.open()
+        queue.offer(old, byteArrayOf(1, 2))
+        val entered = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val failure = AtomicReference<Throwable?>()
+        val reader = Thread {
+            try {
+                entered.countDown()
+                assertNull(queue.await(old, 1_000, minBufferedBytes = 8, bufferWaitMillis = 1_000))
+            } catch (t: Throwable) { failure.set(t) }
+            finally { finished.countDown() }
+        }
+        reader.start()
+        try {
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            val fresh = queue.open()
+            queue.finish(old) // A delayed completion must not mark the fresh generation complete.
+            queue.offer(fresh, byteArrayOf(3, 4))
+            assertTrue(finished.await(2, TimeUnit.SECONDS))
+            assertNull(failure.get())
+            assertArrayEquals(byteArrayOf(3, 4), queue.poll(fresh)!!.bytes)
+            assertEquals(2L, queue.snapshot().cancelledBytes)
+        } finally { queue.close(old); reader.interrupt(); reader.join(2_000) }
+    }
+
     @Test fun byteLimitRejectsNewestWithoutDisturbingOlderSpeech() {
         val queue = ByteBoundedPcmQueue(8)
         val token = queue.open()

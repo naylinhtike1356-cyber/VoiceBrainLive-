@@ -36,8 +36,9 @@ object CommandPlanValidator {
         if (plan.confidence < 50) {
             return Result(false, "ခိုင်းစေချက်ကို သေချာမနားလည်သေးပါ။ နည်းနည်းပိုရှင်းပြပေးပါ။")
         }
-        if (plan.requiresConfirmation && plan.target.isNullOrBlank() && CommandSafetyPolicy.canonical(plan.intent) in TARGET_REQUIRED_COMMANDS) {
-            return Result(false, clarificationFor(plan.intent))
+        // Target validity is independent of whether a direct command needs a second confirmation.
+        if (plan.target.isNullOrBlank() && CommandSafetyPolicy.canonical(plan.intent) in TARGET_REQUIRED_COMMANDS) {
+            return Result(false, clarificationFor(CommandSafetyPolicy.canonical(plan.intent)))
         }
         return Result(true)
     }

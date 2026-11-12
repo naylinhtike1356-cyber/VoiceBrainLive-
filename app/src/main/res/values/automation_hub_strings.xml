@@ -1,23 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hub_title">အော်တိုမေးရှင်း ဗဟိုဌာန</string>
+    <string name="hub_title">Samsung Modes &amp; Routines</string>
     <string name="hub_entry_title">အော်တိုမေးရှင်းနှင့် အချိန်ကိုက်အလုပ်များ (Automation &amp; Tasks Hub)</string>
-    <string name="hub_entry_subtitle">အချိန်ကိုက်အလုပ်များ၊ နေ့စဉ်ရူတင်းများနှင့် အသံမက်ခရိုများ</string>
-    <string name="hub_scheduled_tab">အချိန်ကိုက် အလုပ်များ</string>
-    <string name="hub_routines_tab">နေ့စဉ် ရူတင်းများ</string>
+    <string name="hub_entry_subtitle">မုဒ်များ၊ နေ့စဉ်ရူတင်းများ၊ အသံမက်ခရိုများနှင့် အေဂျင့်အလုပ်များ</string>
+    <string name="hub_modes_tab">မုဒ်များ</string>
+    <string name="hub_routines_tab">ရူတင်းနှင့် မက်ခရို</string>
+    <string name="hub_agent_tasks_tab">အေဂျင့် အလုပ်များ</string>
+    <string name="hub_scheduled_tab">အေဂျင့် အလုပ်များ</string>
     <string name="hub_macros_tab">အသံ မက်ခရိုများ</string>
-    <string name="hub_scheduled_heading">အချိန်ကိုက် အလုပ်များ (Scheduled &amp; Notion Tasks)</string>
-    <string name="hub_routines_heading">နေ့စဉ် ရူတင်းများ (Routines &amp; Reminders)</string>
+    <string name="hub_modes_heading">ဘဝနေထိုင်မှု မုဒ်များ (Samsung Modes)</string>
+    <string name="hub_routines_heading">အလိုအလျောက် ရူတင်းနှင့် မက်ခရိုများ (Routines &amp; Macros)</string>
+    <string name="hub_agent_tasks_heading">အချိန်ကိုက် အေဂျင့် အလုပ်များ (Agent Tasks &amp; Notion)</string>
+    <string name="hub_scheduled_heading">အချိန်ကိုက် အေဂျင့် အလုပ်များ (Agent Tasks &amp; Notion)</string>
     <string name="hub_macros_heading">အသံ မက်ခရိုများ (Voice Macros)</string>
     <string name="hub_labs">စမ်းသပ်ခန်းနှင့် ချိတ်ဆက်မှုများ (Labs &amp; Connections)</string>
     <string name="hub_active">ဖွင့်ထားသည်</string>
     <string name="hub_paused">ခဏရပ်ထားသည်</string>
     <string name="hub_completed">ပြီးပြီ</string>
-    <string name="hub_macro_active">အသံဖြင့် ခေါ်သုံးနိုင်သည်</string>
+    <string name="hub_macro_active">အသံဖြင့် ခေါ်မှ လုပ်ဆောင်မည်</string>
     <string name="hub_macro_invalid">ကွန်မန်ဒ်များ ပြန်စစ်ရန် လိုသည်</string>
     <string name="hub_add_macro">မက်ခရိုအသစ် ဖန်တီးရန်</string>
+    <string name="hub_add_routine">ရူတင်းအသစ် ဖန်တီးရန်</string>
     <string name="hub_connections">AI နှင့် Notion ချိတ်ဆက်ရန်</string>
     <string name="hub_connected_tasks">ကျွန်ုပ်၏ အလုပ်များ</string>
     <string name="hub_schedule_description">App၊ သီချင်းနှင့် AI အလုပ် အချိန်သတ်မှတ်ရန်</string>
     <string name="hub_scheduled_legacy_label">အချိန်သတ်မှတ် အလုပ်များ</string>
+    <string name="hub_modes_explanation">သင့်နေ့စဉ်ဘဝနှင့်အညီ ဖုန်း၏ အသံ၊ သီချင်းနှင့် အလင်းအမှောင်တို့ကို တစ်ချက်နှိပ်ရုံဖြင့် ပြောင်းလဲနိုင်သည်။</string>
+    <string name="hub_routines_explanation">If အခြေအနေ (အချိန်/အသံစကားစု) ပြည့်စုံလျှင် သတ်မှတ်ထားသော အလုပ်များကို အလိုအလျောက် ဆက်တိုက်လုပ်ဆောင်မည်။</string>
+    <string name="hub_agent_tasks_explanation">နောက်ခံတွင် ကိုယ်တိုင်လည်ပတ်မည့် Agent Tasks များနှင့် Notion မှတ်တမ်းအလုပ်များကို စီမံနိုင်သည်။</string>
+    <string name="hub_scheduled_explanation">နောက်ခံတွင် ကိုယ်တိုင်လည်ပတ်မည့် Agent Tasks များနှင့် Notion မှတ်တမ်းအလုပ်များကို စီမံနိုင်သည်။</string>
+    <string name="hub_macros_explanation">အသံဖြင့် စကားစုပြောလိုက်သည်နှင့် လုပ်ဆောင်ချက်များကို ဆက်တိုက် ဆောင်ရွက်မည်။</string>
+    <string name="hub_reminder_elapsed">သတ်မှတ်ချိန် ကျော်သွားပြီ</string>
+    <string name="hub_next_run">နောက်အချိန် · %1$s</string>
 </resources>

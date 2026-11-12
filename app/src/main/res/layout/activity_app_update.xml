@@ -155,7 +155,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="ဗားရှင်းအသစ် ရရှိနေပါပြီ!"
+                    android:text="🎉 ဗားရှင်းအသစ် ရရှိနေပါပြီ!"
                     android:textColor="@color/status_success"
                     android:textSize="17sp"
                     android:textStyle="bold" />
@@ -176,18 +176,20 @@
                 android:id="@+id/tvNewVersionInfo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
                 android:textColor="@color/assistant_text"
-                android:textSize="15sp" />
+                android:textSize="15sp"
+                android:lineSpacingExtra="3dp" />
 
             <TextView
                 android:id="@+id/tvReleaseNotesHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="အသစ်ပါဝင်သော အချက်များ (Release Notes):"
+                android:layout_marginTop="14dp"
+                android:text="📌 အသစ်ပါဝင်သော ပြင်ဆင်ချက်များ (Release Notes):"
                 android:textColor="@color/assistant_text_secondary"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvReleaseNotes"
@@ -197,7 +199,7 @@
                 android:textColor="@color/assistant_text"
                 android:textSize="14sp"
                 android:textIsSelectable="true"
-                android:lineSpacingExtra="3dp"
+                android:lineSpacingExtra="4dp"
                 android:background="#15FFFFFF"
                 android:padding="12dp" />
 
@@ -228,18 +230,31 @@
                     android:gravity="center" />
             </LinearLayout>
 
+            <!-- Action Buttons: Update Now & Remind Later -->
             <Button
                 android:id="@+id/btnDownloadInstall"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:minHeight="52dp"
-                android:text="အသစ် ရယူတပ်ဆင်မည် (Download &amp; Install)"
+                android:text="ယခု Update တင်မည် (Download &amp; Install)"
                 android:textColor="@color/white"
                 android:background="@drawable/bg_button_primary"
                 android:textAllCaps="false"
                 android:layout_marginTop="16dp"
                 android:textSize="15sp"
                 android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnRemindLater"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="နောက်မှ လုပ်မည် (Remind Later)"
+                android:textColor="@color/assistant_text_secondary"
+                android:background="@drawable/bg_button_secondary"
+                android:textAllCaps="false"
+                android:layout_marginTop="10dp"
+                android:textSize="14sp" />
         </LinearLayout>
 
         <!-- Source Configuration Card: public releases need no credentials. -->
@@ -248,7 +263,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="GitHub Public Releases • Token မလိုပါ။ Update စစ်ပြီး Download &amp; Install ကို နှိပ်ပါ။ Android တပ်ဆင်ခွင့်ကို အတည်ပြုပေးရန်သာ လိုပါသည်။"
+            android:text="Verified VoiceBrainLive releases only. A dedicated update source must be configured before downloading."
             android:textColor="@color/assistant_text_secondary"
             android:textSize="14sp"
             android:padding="16dp" />

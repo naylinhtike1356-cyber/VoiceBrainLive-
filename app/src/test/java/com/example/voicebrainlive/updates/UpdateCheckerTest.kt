@@ -7,7 +7,7 @@ import org.junit.Test
 
 class UpdateCheckerTest {
     private val pkg = "com.example.voicebrainlive"
-    private fun release(code: Long = 4) = ReleaseManifest(code, "1.2.0", pkg, "a".repeat(64), 100)
+    private fun release(code: Long = 4L) = ReleaseManifest(code, "1.2.0", pkg, "a".repeat(64), 100L)
     private fun provider(value: ReleaseManifest?) = object : ReleaseProvider {
         override val configured = true
         override suspend fun latest() = value

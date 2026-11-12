@@ -34,6 +34,9 @@ class AgentSpeechTest {
             val manager = app.getSystemService(android.app.NotificationManager::class.java)
             val notice = Shadows.shadowOf(manager).getNotification(94640)
             assertNotNull(notice)
+            val settings = Shadows.shadowOf(notice.actions.single().actionIntent).savedIntent
+            assertEquals(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, settings.action)
+            assertEquals("package:${app.packageName}", settings.data.toString())
             assertFalse(notice.extras.toString().contains("private announcement"))
             val open = Shadows.shadowOf(notice.contentIntent).savedIntent
             assertEquals(com.example.voicebrainlive.AssistantActivity::class.java.name, open.component!!.className)

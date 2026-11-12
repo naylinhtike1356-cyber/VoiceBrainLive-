@@ -8,6 +8,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Pure JVM fake sink only. Tests coordinate workers with latches, never native audio or providers. */
 class BoundedPlaybackControllerTest {
@@ -20,6 +22,7 @@ class BoundedPlaybackControllerTest {
         val threads = mutableSetOf<Long>()
         var throwPause = false
         var decision: ((ByteArray, Int, Int) -> Int)? = null
+        var drainInspection: (() -> Boolean)? = null
         @Synchronized private fun event(name: String) { events += name; threads += Thread.currentThread().id }
         override fun play() { event("play") }
         override fun write(bytes: ByteArray, offset: Int, count: Int): Int {
@@ -37,6 +40,7 @@ class BoundedPlaybackControllerTest {
         override fun flush() { event("flush") }
         override fun stop() { event("stop") }
         override fun release() { event("release"); released.countDown() }
+        override fun hasPendingHardwareDrain(): Boolean = drainInspection?.invoke() ?: false
         fun bytes(): ByteArray = synchronized(output) { output.toByteArray() }
         @Synchronized fun recordedEvents(): List<String> = events.toList()
         @Synchronized fun recordedThreads(): Set<Long> = threads.toSet()
@@ -45,9 +49,170 @@ class BoundedPlaybackControllerTest {
     private fun uninterruptibleAwait(latch: CountDownLatch) {
         while (true) try { latch.await(); return } catch (_: InterruptedException) { /* Deliberately bad sink/factory fixture. */ }
     }
+    private fun awaitNotSpeaking(player: BoundedPlaybackController) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (player.isSpeaking() && System.nanoTime() < deadline) Thread.yield()
+        assertFalse("Playback did not become idle", player.isSpeaking())
+    }
     private fun controller(sink: Sink, onError: (BoundedPlaybackController.Error) -> Unit = {}) =
         BoundedPlaybackController({ sink }, maxQueuedBytes = 16, writeSliceBytes = 4,
             maxZeroWrites = 4, zeroWriteDelayMillis = 1, stopJoinMillis = 1_000, onError = onError)
+
+    @Test fun unevenPacketsArePrebufferedWithoutChangingTheirByteOrder() {
+        val sink = Sink(expectedBytes = 8)
+        val player = BoundedPlaybackController({ sink }, maxQueuedBytes = 16,
+            prebufferBytes = 8, prebufferWaitMillis = 1_000, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            val producer = player.captureProducer()!!
+            player.offer(producer, byteArrayOf(1, 2, 3, 4))
+            assertFalse("First packet played before the jitter buffer filled",
+                sink.accepted.await(60, TimeUnit.MILLISECONDS))
+            assertTrue(sink.recordedEvents().isEmpty())
+            player.offer(producer, byteArrayOf(5, 6, 7, 8))
+            await(sink.accepted)
+            player.stop()
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), sink.bytes())
+        } finally { player.stop() }
+    }
+
+    @Test fun completionImmediatelyReleasesAShortResponseBelowPrebufferThreshold() {
+        val sink = Sink(expectedBytes = 2)
+        val player = BoundedPlaybackController({ sink }, maxQueuedBytes = 16,
+            prebufferBytes = 8, prebufferWaitMillis = 1_000, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, byteArrayOf(1, 2))
+            player.finishResponse()
+            assertTrue("Completed short response remained in prebuffer", sink.accepted.await(500, TimeUnit.MILLISECONDS))
+            player.stop()
+            assertArrayEquals(byteArrayOf(1, 2), sink.bytes())
+        } finally { player.stop() }
+    }
+
+    @Test fun missingCompletionStillReleasesShortAudioAfterBoundedPrebufferWait() {
+        val sink = Sink(expectedBytes = 2)
+        val player = BoundedPlaybackController({ sink }, maxQueuedBytes = 16,
+            prebufferBytes = 8, prebufferWaitMillis = 20, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, byteArrayOf(1, 2))
+            await(sink.accepted)
+            player.stop()
+            assertArrayEquals(byteArrayOf(1, 2), sink.bytes())
+        } finally { player.stop() }
+    }
+
+    @Test fun microphoneStaysGatedAcrossPacketGapsUntilResponseCompletes() {
+        val clock = AtomicLong()
+        val drained = CountDownLatch(1)
+        val sink = Sink(expectedBytes = 2)
+        sink.drainInspection = { if (sink.bytes().size >= 2) drained.countDown(); false }
+        val player = BoundedPlaybackController({ sink }, trackResponse = true,
+            nanoTime = clock::get, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, byteArrayOf(1, 2))
+            await(drained)
+            // Simulate a one-second provider gap after hardware has fully drained.
+            clock.set(TimeUnit.SECONDS.toNanos(1))
+            assertTrue(player.isSpeaking())
+            assertFalse(com.example.voicebrainlive.voice.VoiceInputPolicy.mayForward(
+                true, false, player.isSpeaking(), false))
+            player.finishResponse()
+            awaitNotSpeaking(player)
+            assertTrue(com.example.voicebrainlive.voice.VoiceInputPolicy.mayForward(
+                true, false, player.isSpeaking(), false))
+        } finally { player.stop() }
+    }
+
+    @Test fun lostTurnCompletionDoesNotKeepMicrophoneGatedForever() {
+        val clock = AtomicLong()
+        val drained = CountDownLatch(1)
+        val sink = Sink(expectedBytes = 2)
+        sink.drainInspection = { if (sink.bytes().size >= 2) drained.countDown(); false }
+        val player = BoundedPlaybackController({ sink }, trackResponse = true,
+            nanoTime = clock::get, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, ByteArray(2))
+            await(drained)
+            clock.set(TimeUnit.SECONDS.toNanos(16))
+            awaitNotSpeaking(player)
+        } finally { player.stop() }
+    }
+
+    @Test fun hardwareDrainInspectionNeverRunsOnTheMicrophoneOrUiCaller() {
+        val drained = CountDownLatch(1)
+        val inspectionThread = AtomicReference<Thread>()
+        val sink = Sink(expectedBytes = 2)
+        sink.drainInspection = {
+            inspectionThread.set(Thread.currentThread())
+            if (sink.bytes().size >= 2) drained.countDown()
+            false
+        }
+        val player = controller(sink)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, ByteArray(2))
+            await(drained)
+            repeat(100) { player.isSpeaking() }
+            assertNotSame(Thread.currentThread(), inspectionThread.get())
+        } finally { player.stop() }
+    }
+
+    @Test fun completedResponseKeepsMicrophoneGatedUntilHardwareDrains() {
+        val pending = AtomicBoolean(true)
+        val inspected = CountDownLatch(1)
+        val sink = Sink(expectedBytes = 2)
+        sink.drainInspection = {
+            if (sink.bytes().isNotEmpty()) { inspected.countDown(); pending.get() } else false
+        }
+        val player = BoundedPlaybackController({ sink }, trackResponse = true,
+            acousticTailMillis = 0, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, ByteArray(2))
+            await(inspected)
+            player.finishResponse()
+            assertTrue("Provider completion discarded hardware drain", player.isSpeaking())
+            pending.set(false)
+            awaitNotSpeaking(player)
+        } finally { player.stop() }
+    }
+
+    @Test fun completedResponseRetainsAMonotonic350msEchoTail() {
+        val clock = AtomicLong()
+        val drained = CountDownLatch(1)
+        val sink = Sink(expectedBytes = 2)
+        sink.drainInspection = { if (sink.bytes().isNotEmpty()) drained.countDown(); false }
+        val player = BoundedPlaybackController({ sink }, trackResponse = true,
+            nanoTime = clock::get, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, ByteArray(2))
+            await(drained)
+            player.finishResponse()
+            clock.set(TimeUnit.MILLISECONDS.toNanos(349))
+            assertTrue(player.isSpeaking())
+            clock.set(TimeUnit.MILLISECONDS.toNanos(351))
+            awaitNotSpeaking(player)
+        } finally { player.stop() }
+    }
+
+    @Test fun transientBackpressureLongerThanOld200msBudgetKeepsAudioIntact() {
+        val sink = Sink(List(45) { 0 } + 2, expectedBytes = 2)
+        val player = BoundedPlaybackController({ sink }, maxZeroWrites = 400, stopJoinMillis = 1_000)
+        try {
+            player.start()
+            player.offer(player.captureProducer()!!, byteArrayOf(1, 2))
+            await(sink.accepted)
+            player.stop()
+            assertArrayEquals(byteArrayOf(1, 2), sink.bytes())
+            assertEquals(45L, player.snapshot().zeroWrites)
+            assertEquals(0L, player.snapshot().failures)
+        } finally { player.stop() }
+    }
 
     @Test fun partialAndZeroWritesKeepExactByteOrderWithoutDuplicatingAcceptedBytes() {
         val sink = Sink(listOf(2, 0, 2, 4), expectedBytes = 8)

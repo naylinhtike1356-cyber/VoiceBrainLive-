@@ -19,7 +19,13 @@ object OfflineCommandMatcher {
         Regex("(?:သီချင်း|သီးချင်း)(?:ကို)?(?:လေး)?(?:ဖွင့်|ဆက်ဖွင့်|ပြန်ဖွင့်)") to "media_play",
         Regex("(?:သီချင်း|သီးချင်း)(?:ကို)?(?:ခဏ|ခေတ္တ)?(?:ရပ်|ပိတ်|နား)") to "media_pause",
         Regex("(?:သီချင်း)?နောက်တစ်ပုဒ်(?:ဖွင့်|ပြောင်း)?") to "media_next",
-        Regex("(?:သီချင်း)?ရှေ့တစ်ပုဒ်(?:ဖွင့်|ပြောင်း)?") to "media_previous"
+        Regex("(?:သီချင်း)?ရှေ့တစ်ပုဒ်(?:ဖွင့်|ပြောင်း)?") to "media_previous",
+        Regex("(?:နှိုးစက်|နိုးစက်)(?:ကို)?(?:ခဏ)?(?:ပိတ်|ရပ်|ဖျက်|ပယ်ဖျက်|ဖျက်သိမ်း)") to "stop_wake_alarm",
+        Regex("(?:စိုင်းလန့်|ဆိုင်းလန့်|အသံတိတ်)(?:မုဒ်)?(?:လုပ်|ထား|ဖွင့်)?") to "set_ringer_silent",
+        Regex("(?:တုန်ခါမှု|ဗိုက်ဘရိတ်)(?:မုဒ်)?(?:လုပ်|ထား|ဖွင့်)?") to "set_ringer_vibrate",
+        Regex("(?:ပုံမှန်|အသံဖွင့်)(?:မုဒ်)?(?:လုပ်|ထား|ဖွင့်)?") to "set_ringer_normal",
+        Regex("(?:အလုပ်ဝင်|အလုပ်စ)(?:တော့)?မယ်|အလုပ်ခွင်မုဒ်") to "work_mode",
+        Regex("အိပ်(?:တော့)?မယ်|အိပ်ရာဝင်(?:တော့)?မယ်|အိပ်ရာဝင်မုဒ်") to "bedtime_mode"
     )
     private val directEnglish = mapOf(
         "flashlight on" to "turn_on_flashlight", "turn on flashlight" to "turn_on_flashlight",
@@ -28,9 +34,15 @@ object OfflineCommandMatcher {
         "turn off flashlight" to "turn_off_flashlight", "torch off" to "turn_off_flashlight",
         "volume up" to "volume_up", "louder" to "volume_up", "volume down" to "volume_down",
         "quieter" to "volume_down", "mute" to "mute", "unmute" to "unmute",
+        "silent mode" to "set_ringer_silent", "silent" to "set_ringer_silent",
+        "vibrate mode" to "set_ringer_vibrate", "vibrate" to "set_ringer_vibrate",
+        "normal mode" to "set_ringer_normal", "normal" to "set_ringer_normal",
         "play" to "media_play", "play music" to "media_play", "resume music" to "media_play",
         "pause" to "media_pause", "pause music" to "media_pause", "stop music" to "media_stop",
-        "stop" to "media_stop", "next track" to "media_next", "previous track" to "media_previous"
+        "stop" to "media_stop", "next track" to "media_next", "previous track" to "media_previous",
+        "stop alarm" to "stop_wake_alarm", "turn off alarm" to "stop_wake_alarm",
+        "turn off the alarm" to "stop_wake_alarm", "cancel alarm" to "stop_wake_alarm",
+        "dismiss alarm" to "stop_wake_alarm"
     )
     private val directApps = mapOf(
         "spotify" to "spotify", "စပေါ့တီဖိုင်း" to "spotify", "youtube" to "youtube", "ယူကျူ့" to "youtube",
@@ -45,9 +57,10 @@ object OfflineCommandMatcher {
     )
     private val directVolume = Regex("(?:အသံ(?:ကို)?|volume)([0-9]{1,3})(?:ရာခိုင်နှုန်း|%)?(?:ထား|လုပ်|သတ်မှတ်)?")
     private val directTimer = Regex("(?:([0-9]{1,4})(?:မိနစ်|minutes?)(?:တိုင်မာ|timer)|(?:တိုင်မာ|timer)([0-9]{1,4})(?:မိနစ်|minutes?))(?:ထား|သတ်မှတ်)?")
-    private val directAlarm = Regex("(?:(မနက်|နံနက်|နေ့လယ်|ညနေ|ည))?([0-9]{1,2})(?:နာရီ(?:([0-9]{1,2})မိနစ်)?|:([0-9]{2}))(?:မှာ|အတွက်)?(?:နူးနူးညံ့ညံ့)?(?:အိပ်ရာထဖို့)?(?:နှိုးစက်|နိုးစက်|အလားမ်|နှိုး)(?:ထား|သတ်မှတ်)?")
+    private val directAlarm = Regex("(?:(မနက်ဖြန်|သဘက်ခါ|ဒီနေ့|ယနေ့|tomorrow))?(?:(တနင်္လာ|အင်္ဂါ|ဗုဒ္ဓဟူး|ကြာသပတေး|သောကြာ|စနေ|တနင်္ဂနွေ)(?:နေ့)?)?(?:(?:နှိုးစက်|နိုးစက်)(?:ကို)?)?(?:(မနက်|နံနက်|နေ့လယ်|ညနေ|ည))?([0-9]{1,2})(?:နာရီ(?:([0-9]{1,2})(?:မိနစ်|မီနစ်)?|(ခွဲ))?|:([0-9]{2}))(?:မှာ|အတွက်)?(?:နူးနူးညံ့ညံ့)?(?:အိပ်ရာထဖို့)?(?:နှိုးစက်|နိုးစက်|အလားမ်|နှိုး)?(?:ထား|သတ်မှတ်|ပြောင်း|ပြင်|ချိန်)?")
+    private val directRelativeAlarm = Regex("(?:နောက်|in\\s+)?([0-9]{1,3})\\s*(?:မိနစ်|မီနစ်|minutes?)(?:ကြာရင်)?(?:မှာ)?(?:နှိုးစက်|နိုးစက်|အလားမ်)(?:ထား|သတ်မှတ်|ချိန်)?")
     private val explicitOpen = Regex("(?:open(?: app)?|launch) (.+)")
-    private val forbiddenDirect = Regex("(?:[?？\"“”'‘’]|မဖွင့်|မပိတ်|မလုပ်|မတိုး|မလျှော့|မလျော့|မရပ်|မထား|ဘယ်လို|လား|ရင်|ပြီးတော့|ပြီးရင်|ပြီးလျှင်|နောက်မှ|မနက်ဖြန်|နေ့တိုင်း|အချိန်သတ်မှတ်|နှင့်|နဲ့|၊|;|\\n|\\r|\\b(?:not|don't|do not|if|when|then|and|tomorrow|daily|later)\\b)")
+    private val forbiddenDirect = Regex("(?:[?？\"“”'‘’]|မဖွင့်|မပိတ်|မလုပ်|မတိုး|မလျှော့|မလျော့|မရပ်|မထား|ဘယ်လို|လား|ရင်|ပြီးတော့|ပြီးရင်|ပြီးလျှင်|နောက်မှ|နေ့တိုင်း|အချိန်သတ်မှတ်|နှင့်|နဲ့|၊|;|\\n|\\r|\\b(?:not|don't|do not|if|when|then|and|daily|later)\\b)")
 
     /** No network, learning, target guessing, partial matching, or sensitive effects. */
     fun matchDirectAction(text: String): Triple<String, String?, String?>? {
@@ -70,17 +83,29 @@ object OfflineCommandMatcher {
             val n = (it.groupValues[1].ifBlank { it.groupValues[2] }).toInt()
             return if (n in 1..1440) Triple("set_timer", null, n.toString()) else null
         }
+        directRelativeAlarm.matchEntire(digits)?.let {
+            val offset = it.groupValues[1].toInt()
+            if (offset in 1..1440) {
+                val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MINUTE, offset) }
+                return Triple("set_alarm", "%02d:%02d".format(java.util.Locale.ROOT, cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)), null)
+            }
+        }
         directAlarm.matchEntire(digits)?.let {
-            val period = it.groupValues[1]; var hour = it.groupValues[2].toInt()
-            val minute = it.groupValues[3].ifBlank { it.groupValues[4] }.ifBlank { "0" }.toInt()
+            val dayOffset = it.groupValues[1].takeIf { d -> d.isNotBlank() }
+            val dayOfWeek = it.groupValues[2].takeIf { d -> d.isNotBlank() }
+            val period = it.groupValues[3]; var hour = it.groupValues[4].toInt()
+            val isHalf = it.groupValues[6] == "ခွဲ"
+            val minute = if (isHalf) 30 else it.groupValues[5].ifBlank { it.groupValues[7] }.ifBlank { "0" }.toInt()
             if (minute !in 0..59 || hour !in 0..23) return null
             if (period.isNotBlank()) {
                 if (hour !in 1..12) return null
                 hour = hour % 12 + if (period in setOf("နေ့လယ်", "ညနေ", "ည") && !(period == "ည" && hour == 12)) 12 else 0
-            } else if (it.groupValues[4].isBlank()) return Triple("set_alarm", null, null) // Ask for an unambiguous time.
-            return Triple("set_alarm", "%02d:%02d".format(java.util.Locale.ROOT, hour, minute), null)
+            } else if (it.groupValues[7].isBlank() && !isHalf && it.groupValues[5].isBlank()) return Triple("set_alarm", null, null) // Ask for an unambiguous time.
+            val dayLabel = dayOfWeek ?: dayOffset
+            return Triple("set_alarm", "%02d:%02d".format(java.util.Locale.ROOT, hour, minute), dayLabel)
         }
-        if (compact in setOf("နှိုးစက်", "နိုးစက်", "နှိုးစက်ထား", "နိုးစက်ထား")) return Triple("set_alarm", null, null)
+        if (compact in setOf("နှိုးစက်", "နိုးစက်", "နှိုးစက်ထား", "နိုးစက်ထား", "နှိုးစက်ပြောင်း", "နိုးစက်ပြောင်း", "နှိုးစက်ပြင်", "နိုးစက်ပြင်", "နှိုးစက်ချိန်", "နိုးစက်ချိန်")) return Triple("set_alarm", null, null)
+        if (s.contains("မနက်ဖြန်") || s.contains("tomorrow")) return null
         val app = explicitOpen.matchEntire(s)?.groupValues?.get(1)?.trim()
             ?: if (s.endsWith("ဖွင့်")) s.removeSuffix("ဖွင့်").trim().removeSuffix("ကို").trim()
                 .removeSuffix("app").removeSuffix("အက်ပ်").trim().removeSuffix("ကို").trim() else null
@@ -168,6 +193,10 @@ object OfflineCommandMatcher {
         "အသံပိတ်" to Triple("mute", null, null),
         // Ringer / Silent / Vibration (အသံပိတ်မုဒ်၊ တုန်ခါမှု)
         "အသံပိတ်မုဒ်" to Triple("set_ringer_silent", null, null),
+        "အလုပ်ဝင်တော့မယ်" to Triple("run_macro", "အလုပ်ဝင်တော့မယ်", null),
+        "အလုပ်စတော့မယ်" to Triple("run_macro", "အလုပ်ဝင်တော့မယ်", null),
+        "အိပ်တော့မယ်" to Triple("start_bedtime_music", "bedtime", "30"),
+        "အိပ်ရာဝင်သီချင်းဖွင့်" to Triple("start_bedtime_music", "bedtime", "30"),
         "ဆိုင်းလ့မုဒ်" to Triple("set_ringer_silent", null, null),
         "silent mode" to Triple("set_ringer_silent", null, null),
         "နားချိန်မုဒ်" to Triple("set_ringer_silent", null, null),
@@ -670,6 +699,20 @@ object OfflineCommandMatcher {
             }
         }
 
+        // Check for macro invocation patterns (e.g. "မက်ခရို စာကြည့်ချိန်", "စာကြည့်ချိန် မက်ခရို ဖွင့်ပေးပါ", "run macro study")
+        val macroPatterns = listOf(
+            Regex("^(?:run_macro|run\\s+macro|မက်ခရို)\\s+(.+?)(?:\\s+(?:ဖွင့်|ဖွင့်ပေးပါ|ဖွင့်ပါ|run|runပါ|runပေးပါ|လုပ်|လုပ်ပေးပါ|ခေါ်|ခေါ်ပါ))?$"),
+            Regex("^(.+?)\\s+မက်ခရို(?:\\s+(?:ဖွင့်|ဖွင့်ပေးပါ|ဖွင့်ပါ|run|runပါ|runပေးပါ|လုပ်|လုပ်ပေးပါ|ခေါ်|ခေါ်ပါ))?$")
+        )
+        for (pattern in macroPatterns) {
+            val match = pattern.find(normalized)
+            if (match != null) {
+                val name = match.groupValues[1].trim()
+                if (name.isNotBlank()) {
+                    return Triple("run_macro", name, null)
+                }
+            }
+        }
         // Check for "run_macro [name]" or "run macro [name]" or "မက်ခရို [name]" pattern
         if (normalized.startsWith("run_macro ") || normalized.startsWith("run macro ") || 
             normalized.startsWith("မက်ခရို ")) {

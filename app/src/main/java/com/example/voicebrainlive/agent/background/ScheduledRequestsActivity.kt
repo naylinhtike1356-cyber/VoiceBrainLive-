@@ -44,18 +44,27 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
     private var busy=false
     private var lastError:String?=null
     private var work:Job?=null
+    private var reader:Job?=null
+    private var ticker:Job?=null
+    private var readVersion=0L
+    private var rendered:List<ScheduledRequest>?=null
+    private var renderedError:String?=null
     private var dialog:android.app.AlertDialog?=null
     private val permission=activity.registerForActivityResult(ActivityResultContracts.RequestPermission()){reload()}
     fun attach(body: LinearLayout) {
         repo=ScheduledRequestGraph.repository(this)
-        body.addView(button("+ အလုပ်သစ်","requests_add"){form()})
-        body.addView(button("Notion အကျဉ်းချုပ်","requests_notion"){form(true)})
         status=ConnectedUi.text(this,"").apply{tag="requests_status"};body.addView(status)
+        status.accessibilityLiveRegion=android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+        body.addView(button("+ အလုပ်သစ်","requests_add"){form()})
         val tools = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; visibility=android.view.View.GONE }
-        body.addView(button("သုံးနည်းနှင့် ချိတ်ဆက်မှုများ","requests_tools") {
+        body.addView(button("မှတ်တမ်းနှင့် ဆက်တင်","requests_tools") {
             tools.visibility=if(tools.visibility==android.view.View.VISIBLE)android.view.View.GONE else android.view.View.VISIBLE
         })
         body.addView(tools)
+        tools.addView(button("Agent လုပ်ဆောင်မှု မှတ်တမ်း","requests_agent_activity") {
+            startActivity(Intent(activity,com.example.voicebrainlive.agent.brain.AgentActivityInboxActivity::class.java))
+        })
+        tools.addView(button("Notion အကျဉ်းချုပ်","requests_notion"){form(true)})
         tools.addView(button("အသိပေးချက် ခွင့်ပြုရန်","requests_permission"){
             if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(Manifest.permission.POST_NOTIFICATIONS)
             else startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName))
@@ -74,8 +83,17 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
         })
         rows=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;tag="requests_rows"};body.addView(rows)
     }
-    fun resume(){if(owner==null)owner=Any();reload()}
-    fun pause(){owner=null;work?.cancel();dialog?.dismiss();dialog=null}
+    fun resume(){
+        if(owner==null)owner=Any()
+        reload(recover=true)
+        if(ticker?.isActive!=true)ticker=activity.lifecycleScope.launch {
+            while(isActive){delay(3_000);if(dialog?.isShowing!=true)reload()}
+        }
+    }
+    fun pause(){
+        owner=null;readVersion++;reader?.cancel();reader=null;ticker?.cancel();ticker=null
+        work?.cancel();dialog?.dismiss();dialog=null;rendered=null
+    }
     private fun dp(n:Int)=ConnectedUi.dp(this,n)
     private fun button(label:String,key:String,action:()->Unit)=com.google.android.material.button.MaterialButton(
         this,null,if(key=="requests_add")com.google.android.material.R.attr.materialButtonStyle else com.google.android.material.R.attr.borderlessButtonStyle
@@ -89,6 +107,11 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
     private fun perform(action:suspend()->Unit){
         if(busy||owner==null)return
         val lease=owner;busy=true;lastError=null
+        rendered=null
+        readVersion++;reader?.cancel();reader=null
+        status.text="လုပ်ဆောင်နေသည်… ရလဒ် စောင့်ပေးပါ။"
+        fun disable(view:android.view.View){view.isEnabled=false;if(view is android.view.ViewGroup)for(i in 0 until view.childCount)disable(view.getChildAt(i))}
+        disable(rows)
         lateinit var launched:Job
         launched=activity.lifecycleScope.launch(start=CoroutineStart.LAZY){
             try {withContext(Dispatchers.IO){action()}}
@@ -103,17 +126,35 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
         }
         work=launched;launched.start()
     }
-    private fun reload(){
+    private fun reload(recover:Boolean=false){
         if(!::rows.isInitialized||owner==null||busy)return
+        if(reader?.isActive==true)return
         val lease=owner
-        activity.lifecycleScope.launch{
+        val version=++readVersion
+        reader=activity.lifecycleScope.launch{
             try{
-                val list=withContext(Dispatchers.IO){repo.recover()}
-                if(owner!==lease)return@launch
+                val list=withContext(Dispatchers.IO){if(recover)repo.recover()else repo.history()}
+                if(owner!==lease||readVersion!=version||busy)return@launch
+                if(rendered==list&&renderedError==lastError)return@launch
+                rendered=list;renderedError=lastError
+                rows.isEnabled=true
                 rows.removeAllViews()
-                status.text=(lastError?.plus("\n").orEmpty())+if(list.isEmpty())"အလုပ်မရှိသေးပါ။ အလုပ်သစ်တစ်ခု သတ်မှတ်ပါ။" else "သိမ်းထားသော အလုပ် ${list.size} ခု။ နောက်ခံအချိန်သည် Android နှင့် ဘက်ထရီအခြေအနေကြောင့် နောက်ကျနိုင်သည်။"
-                list.asReversed().forEach{r->
+                val counts=list.groupingBy{RequestPresentation.section(it.state)}.eachCount()
+                val summary=if(list.isEmpty())"အလုပ်မရှိသေးပါ။ အလုပ်သစ်တစ်ခု သတ်မှတ်ပါ။" else
+                    "ဆက်လုပ်ရန် ${counts[RequestSection.ATTENTION]?:0} · လုပ်နေဆဲ ${counts[RequestSection.ACTIVE]?:0}\nအချိန်စောင့် ${counts[RequestSection.UPCOMING]?:0}"
+                val statusText=lastError?.plus("\n").orEmpty()+summary
+                if(status.text.toString()!=statusText)status.text=statusText
+                var previous:RequestSection?=null
+                RequestPresentation.ordered(list).forEach{r->
+                    val section=RequestPresentation.section(r.state)
+                    if(section!=previous){
+                        rows.addView(ConnectedUi.text(this@ScheduledRequestsPanel,"${section.title} · ${counts[section]}",16f).apply {
+                            tag="requests_section_${section.name}";setPadding(0,dp(16),0,dp(8))
+                            androidx.core.view.ViewCompat.setAccessibilityHeading(this,true)
+                        });previous=section
+                    }
                     val card=LinearLayout(this@ScheduledRequestsPanel).apply{
+                        tag="requests_card_${r.id}"
                         orientation=LinearLayout.VERTICAL
                         setPadding(dp(16),dp(12),dp(16),dp(12))
                         setBackgroundResource(com.example.voicebrainlive.R.drawable.bg_card)
@@ -126,7 +167,8 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
                         layoutParams=LinearLayout.LayoutParams(-2,-2)
                         setTextColor(com.google.android.material.color.MaterialColors.getColor(this,com.google.android.material.R.attr.colorPrimary))
                     })
-                    card.addView(ConnectedUi.text(this@ScheduledRequestsPanel,"${kind(r.kind)}\n${date(r.dueAt)}\n${r.packageName}"))
+                    card.addView(ConnectedUi.text(this@ScheduledRequestsPanel,"${kind(r.kind)}\n${date(r.dueAt)}"))
+                    card.addView(ConnectedUi.text(this@ScheduledRequestsPanel,RequestPresentation.next(r),14f).apply{tag="requests_next_${r.id}"})
                     r.brief?.let{card.addView(ConnectedUi.text(this@ScheduledRequestsPanel,if(it.automatic)"ဤအလုပ်အတွက်သာ နောက်ခံဖတ်/AI အကျဉ်းချုပ် ခွင့်ပြုထားသည်"else "အချိန်ရောက်လျှင် ပြန်အတည်ပြုရန် စောင့်မည်"))}
                     r.briefResult?.let{result->
                         card.addView(ConnectedUi.text(this@ScheduledRequestsPanel,result.summary))
@@ -134,6 +176,9 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
                     }
                     if(r.reason.isNotBlank())card.addView(ConnectedUi.text(this@ScheduledRequestsPanel,reason(r.reason)))
                     if(r.state==RequestState.READY)card.addView(button("ကြည့်ပြီး ဆက်လုပ်ရန်","requests_review_${r.id}"){review(r)})
+                    if(r.state==RequestState.DRAFT_READY)card.addView(button("AI မူကြမ်း ဖွင့်ရန်","requests_draft_${r.id}"){
+                        if(owner!=null&&!busy)startActivity(Intent(this@ScheduledRequestsPanel,ConnectedAgentActivity::class.java).putExtra("scheduled_draft_id",r.id))
+                    })
                     if(r.state in setOf(RequestState.SCHEDULED,RequestState.READY))card.addView(button("ခဏရပ်ရန်","requests_pause_${r.id}"){
                         perform{repo.pause(r);ScheduledRequestGraph.cancel(this@ScheduledRequestsPanel,r.id)}
                     })
@@ -146,7 +191,7 @@ internal class ScheduledRequestsPanel(private val activity: AppCompatActivity) :
                         })
                     rows.addView(card)
                 }
-            }catch(c:CancellationException){throw c}catch(_:Exception){if(owner===lease){rows.removeAllViews();status.text="လုံခြုံသော သိမ်းဆည်းမှုကို ဖတ်မရပါ။ အလုပ်အသစ် မသိမ်းပါ။ မူလဒေတာ မပြောင်းပါ။"}}
+            }catch(c:CancellationException){throw c}catch(_:Exception){if(owner===lease&&readVersion==version){rendered=null;rows.removeAllViews();status.text="လုံခြုံသော သိမ်းဆည်းမှုကို ဖတ်မရပါ။ အလုပ်အသစ် မသိမ်းပါ။ မူလဒေတာ မပြောင်းပါ။"}}
         }
     }
     private suspend fun enqueue(r:ScheduledRequest){

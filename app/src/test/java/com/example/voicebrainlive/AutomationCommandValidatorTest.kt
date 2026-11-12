@@ -7,6 +7,21 @@ import org.junit.Test
 
 class AutomationCommandValidatorTest {
     @Test
+    fun directCallAndMessageExceptionsDoNotAuthorizeAutomaticMacros() {
+        listOf("make_call", "dial", "call_quick_contact", "send_sms", "send_messenger", "reply_messenger", "whatsapp").forEach { command ->
+            assertFalse(command, AutomationCommandValidator.validateSequence("$command:Mom:hello").valid)
+        }
+    }
+
+    @Test
+    fun reviewedMessageKeepsSemicolonsAsPayload() {
+        val sequence = "send_sms:Mom:hello; do not split this"
+        org.junit.Assert.assertEquals(listOf(sequence), AutomationCommandValidator.extractSteps(sequence))
+        assertTrue(AutomationCommandValidator.validateSequence(sequence, allowApprovalRequired = true).valid)
+        assertFalse(AutomationCommandValidator.validateSequence(sequence).valid)
+    }
+
+    @Test
     fun validSequence_isAccepted() {
         assertTrue(AutomationCommandValidator.validateSequence("set_focus_mode:30;set_ringer_silent").valid)
     }

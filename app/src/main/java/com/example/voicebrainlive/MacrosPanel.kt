@@ -13,6 +13,7 @@ import com.example.voicebrainlive.MacrosActivity.MacroItem
 import com.example.voicebrainlive.MacrosActivity.MacrosAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.voicebrainlive.commands.AutomationCommandValidator
+import com.example.voicebrainlive.commands.MacroDefinitions
 import com.example.voicebrainlive.databinding.ActivityMacrosBinding
 
 /** Same macro preferences and validation for the hub and legacy entry point. */
@@ -25,8 +26,7 @@ internal class MacrosPanel(context: Context, private val binding: ActivityMacros
         if (ThemeUtils.getTheme(this) == "light") binding.root.setBackgroundResource(R.drawable.bg_gradient_light)
         prefs = getSharedPreferences("custom_macros", Context.MODE_PRIVATE)
 
-        // Pre-populate defaults if empty
-        ensureDefaultMacros()
+        // Opening a list must not create executable definitions or restore deleted macros.
 
         binding.btnAddMacro.setOnClickListener { showCreateOrEditDialog(null) }
 
@@ -57,25 +57,8 @@ internal class MacrosPanel(context: Context, private val binding: ActivityMacros
         binding.recyclerMacros.layoutManager = LinearLayoutManager(this)
         binding.recyclerMacros.adapter = adapter
     }
-    private fun ensureDefaultMacros() {
-        val all = prefs.all
-        if (all.isEmpty()) {
-            prefs.edit().apply {
-                putString("study mode", "set_focus_mode:30;set_ringer_silent")
-                putString("စာကြည့်ချိန်", "set_focus_mode:30;set_ringer_silent")
-                putString("night mode", "set_ringer_silent;turn_off_flashlight")
-                putString("အိပ်တော့မယ်", "set_ringer_silent;turn_off_flashlight")
-                putString("morning routine", "get_weather;my_schedule;volume_up")
-                putString("မနက်ခင်း", "get_weather;my_schedule;volume_up")
-                putString("meeting mode", "set_ringer_vibrate;mute")
-                putString("အစည်းအဝေး", "set_ringer_vibrate;mute")
-                apply()
-            }
-        }
-    }
-
     fun loadMacros() {
-        val list = prefs.all.mapNotNull { (k, v) -> (v as? String)?.let { MacroItem(k, it) } }
+        val list = MacroDefinitions.entries(prefs.all).map { (k, v) -> MacroItem(k, v) }
             .sortedBy { it.name }
         adapter.updateList(list)
 
@@ -134,10 +117,23 @@ internal class MacrosPanel(context: Context, private val binding: ActivityMacros
         container.addView(etName)
         container.addView(tvLabelSequence)
         container.addView(etSequence)
+        val preview = TextView(this).apply {
+            tag = "macro_step_preview"
+            setPadding(0, (12 * resources.displayMetrics.density).toInt(), 0, 0)
+            textSize = 14f
+        }
+        container.addView(preview)
+        fun updatePreview() { preview.text = "လုပ်မည့် အဆင့်များ\n" + MacroDefinitions.preview(etSequence.text.toString()) }
+        etSequence.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = updatePreview()
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        updatePreview()
 
         dialog = AlertDialog.Builder(this)
             .setTitle(title)
-            .setView(container)
+            .setView(android.widget.ScrollView(this).apply { addView(container) })
             .setPositiveButton("သိမ်းမည်", null)
             .setNegativeButton("မသိမ်းပါ") { dialog, _ -> dialog.dismiss() }
             .create().also { dialog ->
@@ -150,12 +146,16 @@ internal class MacrosPanel(context: Context, private val binding: ActivityMacros
                         Toast.makeText(this, "အချက်အလက် ပြည့်စုံစွာ ဖြည့်ပေးပါ။", Toast.LENGTH_SHORT).show()
                         return@setOnClickListener
                     }
-                    if (name == "show_macro_guide") {
+                    if (MacroDefinitions.normalize(name) == MacroDefinitions.GUIDE_KEY) {
                         etName.error = "ဤအမည်ကို အက်ပ်ဆက်တင်အတွက် သီးသန့်ထားပါသည်။"
                         return@setOnClickListener
                     }
                     if (name.length > 60) {
                         Toast.makeText(this, "မက်ခရိုအမည်သည် 60 characters ထက် မကျော်ရပါ။", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    if (!isEdit && prefs.all.keys.any { MacroDefinitions.normalize(it) == MacroDefinitions.normalize(name) }) {
+                        etName.error = "ဤအမည် ရှိပြီးသားပါ။ မူလမက်ခရိုကို နှိပ်ပြီး ပြင်နိုင်သည်။"
                         return@setOnClickListener
                     }
                     val validation = AutomationCommandValidator.validateSequence(sequence)
@@ -164,7 +164,7 @@ internal class MacrosPanel(context: Context, private val binding: ActivityMacros
                         return@setOnClickListener
                     }
 
-                    prefs.edit().putString(name, sequence).apply()
+                    prefs.edit().putString(if (isEdit) name else MacroDefinitions.normalize(name), sequence).apply()
                     Toast.makeText(this, "မက်ခရိုကို သိမ်းဆည်းလိုက်ပါပြီ။", Toast.LENGTH_SHORT).show()
                     loadMacros()
                     dialog.dismiss()

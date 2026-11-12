@@ -80,18 +80,20 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (service != null) {
             service.sendTextInput(text)
         } else {
-            if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) {
+            if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
                 val executor = phoneExecutor
                 viewModelScope.launch {
                     val result = com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
+                        { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync)
                     if (result != null) {
                         if (phoneExecutor !== executor) return@launch
                         geminiClient.invalidateAgentContext()
-                        listener?.onTranscript(result)
-                        com.example.voicebrainlive.commands.ChatUiBridge.notifyAssistant(result)
-                        listener?.speakResultWithTTS(result)
+                        val display = com.example.voicebrainlive.commands.CommandResultFormatter.format(result)
+                        listener?.onTranscript(display)
+                        com.example.voicebrainlive.commands.ChatUiBridge.notifyAssistant(display)
+                        listener?.speakResultWithTTS(display)
                     } else {
                         geminiClient.sendConversationInput(text)
                     }
@@ -182,7 +184,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         audioRecorder = AudioRecorderHelper().apply {
             useVoiceCommunicationForNoisyEnv = SettingsActivity.isNoisyEnvMode(app)
         }
-        audioPlayer = AudioPlayerHelper().apply {
+        audioPlayer = AudioPlayerHelper(trackResponse = true).apply {
             onError = { message -> this@AssistantViewModel.listener?.onError(message) }
         }
     }
@@ -240,6 +242,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val player = audioPlayer
         // All lease mutations/registrations occur on Main, avoiding Epoch -> lease lock waits.
         viewModelScope.launch(Dispatchers.Main) {
+            // Ordered behind PCM admission on Main; do not reopen the mic between packets.
+            player.finishResponse()
             playbackDrainLease.replace { token ->
                 playbackDrainJob?.cancel()
                 playbackDrainJob = viewModelScope.launch(Dispatchers.IO) {
@@ -281,9 +285,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             if (focusUnavailableForTurn) return@replace
             if (isFirstAudioChunkOfTurn) {
                 if (!AudioFocusHelper.requestForSpeech(app, player)) {
-                    focusUnavailableForTurn = true
-                    player.onError?.invoke("Audio focus unavailable; text response remains available.")
-                    return@replace
+                    Log.w("AssistantViewModel", "AudioFocus not granted; continuing audio playback")
                 }
                 isFirstAudioChunkOfTurn = false
             }

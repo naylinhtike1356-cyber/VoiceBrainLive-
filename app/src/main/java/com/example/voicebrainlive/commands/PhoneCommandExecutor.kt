@@ -313,22 +313,25 @@ class PhoneCommandExecutor(private val context: Context) {
 
     private fun createMacro(name: String, commandsSequence: String): String {
         val normalized = name.trim().lowercase(Locale.ROOT)
-        if (normalized.isBlank() || normalized.length > BoundedMacroRunner.MAX_NAME_CHARS ||
+        if (normalized.isBlank() || normalized == MacroDefinitions.GUIDE_KEY || normalized.length > BoundedMacroRunner.MAX_NAME_CHARS ||
             commandsSequence.isBlank() || commandsSequence.length > BoundedMacroRunner.MAX_SEQUENCE_CHARS) {
             return "BLOCKED: Macro name/sequence exceeds its local storage bounds; no write performed."
         }
         val macroPrefs = context.getSharedPreferences("custom_macros", Context.MODE_PRIVATE)
-        if (!macroPrefs.edit().putString(normalized, commandsSequence).commit())
+        val matching = MacroDefinitions.entries(macroPrefs.all).keys.filter { MacroDefinitions.normalize(it) == normalized }
+        if (matching.size > 1) return "BLOCKED: Macro name is ambiguous. Review existing definitions."
+        if (!macroPrefs.edit().putString(matching.singleOrNull() ?: normalized, commandsSequence).commit())
             return "FAILED: Macro definition could not be persisted. No execution started."
         return "မက်ခရို '$name' ကို အောင်မြင်စွာ ဖန်တီးပြီးပါပြီ။"
     }
 
     private suspend fun runMacro(name: String): String {
         val macroPrefs = context.getSharedPreferences("custom_macros", Context.MODE_PRIVATE)
+        val verification = MacroDeviceVerification(context)
         val runner = BoundedMacroRunner(
             // Runner freezes each exact SharedPreferences definition during complete preflight,
             // then rechecks those captured snapshots before each leaf. No live nested dispatch.
-            lookupDefinition = { id -> macroPrefs.getString(id, null) },
+            lookupDefinition = { id -> MacroDefinitions.lookup(macroPrefs.all, id) },
             classifyRisk = { command ->
                 when (CommandSafetyPolicy.classify(command)) {
                     CommandSafetyPolicy.Classification.SAFE -> MacroLeafRisk.SAFE
@@ -337,7 +340,7 @@ class PhoneCommandExecutor(private val context: Context) {
                 }
             },
             dispatchThroughCommonGuard = { leaf ->
-                OpaqueMacroResults.classify(executeAsync(leaf.command, leaf.target, leaf.value))
+                verification.dispatch(leaf) { executeAsync(leaf.command, leaf.target, leaf.value) }
             },
             monotonicMillis = { android.os.SystemClock.elapsedRealtime() }
         )

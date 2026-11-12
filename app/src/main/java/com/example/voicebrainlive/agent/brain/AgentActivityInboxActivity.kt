@@ -40,7 +40,7 @@ object AgentActivityProjection {
                     else->"Saved user task. No automated action has run."
                 }
                 rows += AgentInboxRow("brain:${plan.taskId}",plan.taskId,task.revision,InboxSource.BRAIN,
-                    task.state,"Local task",plan.objective+"\n"+note,"Your local task",null,
+                    task.state,plan.objective,plan.objective+"\n"+note,"Your local task",null,
                     canCancel=task.snapshot.status==AgentStatus.DRAFT)
                 return@forEach
             }
@@ -75,7 +75,7 @@ object AgentActivityProjection {
                     output + (record?.errorCode?.let { "\nBlocked reason: $it" } ?: "")
             } + "\n${reason.orEmpty()}\nThis view never approves or executes actions."
             rows += AgentInboxRow("brain:${plan.taskId}", plan.taskId, task.revision, InboxSource.BRAIN, state,
-                "Saved agent plan", detail, attribution, reason, proposals.isNotEmpty(),
+                plan.objective, detail, attribution, reason, proposals.isNotEmpty(),
                 canCancel = task.state !in setOf(PersistentTaskState.RUNNING, PersistentTaskState.COMPLETED, PersistentTaskState.CANCELLED))
         }
         scheduled.forEach { task ->
@@ -144,20 +144,31 @@ open class AgentActivityInboxActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var rows: LinearLayout
     override fun onCreate(savedInstanceState: Bundle?) {
-        ThemeUtils.applyTheme(this); super.onCreate(savedInstanceState)
+        com.example.voicebrainlive.agent.connected.ConnectedUi.theme(this)
+        setTheme(if (ThemeUtils.getTheme(this)=="light") com.example.voicebrainlive.R.style.Theme_VoiceBrainLive_AutomationHub_Light else com.example.voicebrainlive.R.style.Theme_VoiceBrainLive_AutomationHub)
+        super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24); isSaveEnabled = false }
+        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(16), dp(16), dp(16)); isSaveEnabled = false }
         val beta=application as? com.example.voicebrainlive.ui.InteractiveBetaSettings
         if(beta!=null)page.addView(beta.betaHeader(this,"Activity & Approvals"))
         else {page.addView(button("နောက်သို့", "inbox_back") { finish() });page.addView(label("လုပ်ဆောင်မှုနှင့် ခွင့်ပြုချက်များ"))}
-        page.addView(label(if(application is com.example.voicebrainlive.ui.InteractiveBetaSettings) "သိမ်းထားသော ရလဒ်နှင့် အဆိုပြုထားသော အလုပ်များ ဖြစ်သည်။ ကြည့်ရုံဖြင့် မလုပ်ဆောင်ပါ။" else "သိမ်းထားသော လုပ်ဆောင်မှုများ ဖြစ်သည်။ အဆိုပြုအလုပ်များကို အသစ် အတည်ပြုရန် လိုသည်။ ဤနေရာမှ ကြည့်ရုံဖြင့် မလုပ်ဆောင်ပါ။ စမ်းသပ်စည်းမျဉ်းများနှင့် တကယ့်အချိန်ဇယားကို သီးခြားခွဲထားသည်။"))
+        page.addView(label("ကြည့်ရုံဖြင့် မလုပ်ဆောင်ပါ။").apply{textSize=13f})
         page.addView(button("လုပ်ဆောင်မှု မှတ်တမ်း ပြန်ကြည့်ရန်", "inbox_refresh") { refresh() })
+        status = label("ဖတ်နေသည်…").apply { tag = "inbox_status"; accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE }; page.addView(status)
+        rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = "inbox_rows"; isSaveEnabled = false }; page.addView(rows)
         if(application !is com.example.voicebrainlive.ui.InteractiveBetaSettings) page.addView(button("စမ်းသပ် စည်းမျဉ်းများ စီမံရန်", "inbox_rules") {
             startActivity(android.content.Intent(this, ProactiveRulesActivity::class.java))
         })
-        status = label("ဖတ်နေသည်…").apply { tag = "inbox_status" }; page.addView(status)
-        rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = "inbox_rows"; isSaveEnabled = false }; page.addView(rows)
-        setContentView(ScrollView(this).apply { isSaveEnabled = false; addView(page) })
+        val scroll=ScrollView(this).apply {
+            isSaveEnabled = false
+            setBackgroundResource(if(ThemeUtils.getTheme(this@AgentActivityInboxActivity)=="light") com.example.voicebrainlive.R.drawable.bg_gradient_light else com.example.voicebrainlive.R.drawable.bg_gradient)
+            addView(page)
+        }
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll) { view, insets ->
+            val bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left,bars.top,bars.right,bars.bottom);insets
+        }
+        setContentView(scroll)
     }
     override fun onResume() { super.onResume(); visible = true; refresh() }
     override fun onPause() {
@@ -188,7 +199,12 @@ open class AgentActivityInboxActivity : AppCompatActivity() {
                 if (row != null) mutate(row, pause)
                 val loaded = readRows()
                 if (!visible || generation != owner) return@launch
-                state = loaded; status.text = if (loaded.rows.isEmpty()) "လုပ်ဆောင်မှု မှတ်တမ်း မရှိသေးပါ။" else "မှတ်တမ်း ဖတ်ပြီးပါပြီ။ ယခင်ခွင့်ပြုချက်များ ပြန်မသုံးပါ။"
+                state = loaded; status.text = if (loaded.rows.isEmpty()) "လုပ်ဆောင်မှု မှတ်တမ်း မရှိသေးပါ။" else {
+                    val counts=loaded.rows.groupingBy { group(it.state) }.eachCount()
+                    listOf("လုပ်နေဆဲ","ဆက်လုပ်ရန်","အချိန်စောင့်","ခဏရပ်","မှတ်တမ်း").mapIndexedNotNull { index, title ->
+                        counts[index]?.let { "$title $it" }
+                    }.joinToString(" · ")
+                }
                 render(owner)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { if (visible && generation == owner) status.text = "မှတ်တမ်း ဖတ်မရပါ။ မူလဒေတာ မဖျက်ပါ။ ပြန်ကြည့်ပြီးမှ ထပ်ကြိုးစားပါ။" }
@@ -196,15 +212,65 @@ open class AgentActivityInboxActivity : AppCompatActivity() {
     }
     private fun render(owner: Long) {
         rows.removeAllViews()
-        state.rows.forEach { row ->
+        var previous=-1
+        state.rows.sortedBy { group(it.state) }.forEach { row ->
+            val section=group(row.state)
+            if(section!=previous){
+                rows.addView(label(listOf("ယခု လုပ်ဆောင်နေသည်","ဆက်လုပ်ရန် လိုသော အလုပ်များ","နောက်လုပ်မည့် အလုပ်များ","ခဏရပ်ထားသော အလုပ်များ","ပြီးဆုံးသော မှတ်တမ်း")[section]).apply {
+                    textSize=18f;setPadding(0,dp(16),0,dp(8));tag="inbox_section_$section"
+                    androidx.core.view.ViewCompat.setAccessibilityHeading(this,true)
+                });previous=section
+            }
             fun current() = visible && generation == owner && state.rows.any { it.key == row.key && it.revision == row.revision }
-            rows.addView(label("${row.title}\n${row.state.name.replace('_', ' ')}\n${row.attribution}\n${row.blockedReason.orEmpty()}"))
-            rows.addView(button("အသေးစိတ် ကြည့်ရန်", "inbox_details_${row.key}") { if (current()) showDetails(row) })
-            if (row.canCancel) rows.addView(button("စောင့်နေသော အလုပ် ပယ်ဖျက်ရန်", "inbox_cancel_${row.key}") {
+            val card=LinearLayout(this).apply {
+                orientation=LinearLayout.VERTICAL;isSaveEnabled=false;tag="inbox_card_${row.key}"
+                setPadding(dp(16),dp(12),dp(16),dp(12));setBackgroundResource(com.example.voicebrainlive.R.drawable.bg_card)
+                backgroundTintList=android.content.res.ColorStateList.valueOf(com.google.android.material.color.MaterialColors.getColor(this,com.google.android.material.R.attr.colorSurface))
+                layoutParams=LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(12)}
+            }
+            card.addView(label(row.title).apply{textSize=18f})
+            card.addView(label(stateLabel(row.state)).apply{
+                textSize=13f;setBackgroundResource(com.example.voicebrainlive.R.drawable.bg_hub_badge)
+                layoutParams=LinearLayout.LayoutParams(-2,-2)
+            })
+            card.addView(label(nextStep(row)).apply{textSize=14f;tag="inbox_next_${row.key}"})
+            card.addView(label(row.attribution).apply{textSize=12f})
+            row.blockedReason?.let { card.addView(label(it).apply{textSize=13f}) }
+            card.addView(button("အသေးစိတ် ကြည့်ရန်", "inbox_details_${row.key}") { if (current()) showDetails(row) })
+            if (row.canCancel) card.addView(button("စောင့်နေသော အလုပ် ပယ်ဖျက်ရန်", "inbox_cancel_${row.key}") {
                 if (current()) launch(row, false)
             })
-            if (row.canPause) rows.addView(button("ဤအလုပ် သို့မဟုတ် စည်းမျဉ်း ခဏရပ်ရန်", "inbox_pause_${row.key}") { if (current()) launch(row, true) })
+            if (row.canPause) card.addView(button("ဤအလုပ် သို့မဟုတ် စည်းမျဉ်း ခဏရပ်ရန်", "inbox_pause_${row.key}") { if (current()) launch(row, true) })
+            rows.addView(card)
         }
+    }
+    private fun dp(value:Int)=(value*resources.displayMetrics.density+0.5f).toInt()
+    private fun group(s:PersistentTaskState)=when(s){
+        PersistentTaskState.RUNNING->0
+        PersistentTaskState.DRAFT,PersistentTaskState.WAITING_FOR_APPROVAL,PersistentTaskState.BLOCKED,PersistentTaskState.FAILED->1
+        PersistentTaskState.SCHEDULED->2
+        PersistentTaskState.PAUSED->3
+        PersistentTaskState.COMPLETED,PersistentTaskState.CANCELLED->4
+    }
+    private fun stateLabel(s:PersistentTaskState)=when(s){
+        PersistentTaskState.DRAFT->"မူကြမ်း · မလုပ်ဆောင်ရသေးပါ"
+        PersistentTaskState.WAITING_FOR_APPROVAL->"အတည်ပြုချက် စောင့်နေသည်"
+        PersistentTaskState.SCHEDULED->"အချိန်စောင့်နေသည်"
+        PersistentTaskState.RUNNING->"လုပ်ဆောင်နေသည်"
+        PersistentTaskState.PAUSED->"ခဏရပ်ထားသည်"
+        PersistentTaskState.BLOCKED->"လုပ်ဆောင်မှု ရပ်ထားသည်"
+        PersistentTaskState.FAILED->"မအောင်မြင်ပါ"
+        PersistentTaskState.COMPLETED->"ပြီးဆုံးပြီ"
+        PersistentTaskState.CANCELLED->"ပယ်ဖျက်ပြီး"
+    }
+    private fun nextStep(row:AgentInboxRow):String=when{
+        row.requiresFreshApproval->"နောက်တစ်ဆင့် · အလုပ်အသေးစိတ်ကို ပြန်စစ်ပြီး မူလအလုပ်စာမျက်နှာမှ အသစ် အတည်ပြုရန် လိုသည်။"
+        row.state==PersistentTaskState.RUNNING->"ရလဒ် စောင့်နေသည်။ ဤနေရာမှ ထပ်မလုပ်ဆောင်ပါ။"
+        row.state==PersistentTaskState.SCHEDULED->"နောက်တစ်ဆင့် · သတ်မှတ်ထားသော အချိန် စောင့်နေသည်။"
+        row.state==PersistentTaskState.DRAFT->"နောက်တစ်ဆင့် · အသေးစိတ်ကို စစ်ပါ။ မလုပ်ဆောင်ရသေးပါ။"
+        row.state in setOf(PersistentTaskState.BLOCKED,PersistentTaskState.FAILED)->"နောက်တစ်ဆင့် · ရပ်ရသည့် အကြောင်းရင်းနှင့် အဆင့်ရလဒ်များကို အသေးစိတ်တွင် စစ်ပါ။"
+        row.state==PersistentTaskState.PAUSED->"ခဏရပ်ထားသည်။ မူလအလုပ်စာမျက်နှာတွင် ပြန်စီစဉ်နိုင်သည်။"
+        else->"အဆင့်တစ်ခုချင်းစီ၏ ရလဒ်ကို အသေးစိတ်တွင် ကြည့်နိုင်သည်။"
     }
     private fun showDetails(row: AgentInboxRow) {
         clearDetails()
@@ -218,8 +284,11 @@ open class AgentActivityInboxActivity : AppCompatActivity() {
     private fun clearDetails() { privateText?.text = ""; privateText = null; dialog?.dismiss(); dialog = null }
     private fun label(value: String) = TextView(this).apply {
         text = value; textSize = 17f; setTextIsSelectable(true); isSaveEnabled = false; isSaveFromParentEnabled = false
+        setTextColor(com.google.android.material.color.MaterialColors.getColor(this,com.google.android.material.R.attr.colorOnSurface))
+        setPadding(0,dp(4),0,dp(4))
+        setLineSpacing(dp(3).toFloat(),1f)
     }
-    private fun button(value: String, marker: String, click: () -> Unit) = Button(this).apply {
+    private fun button(value: String, marker: String, click: () -> Unit) = com.google.android.material.button.MaterialButton(this).apply {
         text = value; tag = marker; contentDescription = value; isAllCaps = false; minHeight = (48 * resources.displayMetrics.density).toInt()
         setOnClickListener { click() }
     }

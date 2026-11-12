@@ -3,23 +3,31 @@ package com.example.voicebrainlive.audio
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.os.Build
 import android.os.Process
 import android.util.Base64
 
 /** Bounded worker-owned playback preserving source APIs and PCM/media-volume configuration. */
-class AudioPlayerHelper {
+class AudioPlayerHelper(private val trackResponse: Boolean = false) {
     companion object {
         const val SAMPLE_RATE = 24000
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_OUT_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         internal const val BUFFER_SIZE_MULTIPLIER = 8
+        internal const val PREBUFFER_MILLIS = 40L
     }
 
     @Volatile var onError: ((String) -> Unit)? = null
     private val controller = BoundedPlaybackController(
         sinkFactory = { AndroidPcmSink() },
         onWorkerStart = { try { Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO) } catch (_: Exception) {} },
-        onError = { onError?.invoke("Audio playback error: ${it.name}") }
+        onError = { onError?.invoke("Audio playback error: ${it.name}") },
+        // Queue capacity handles bursts; a small prebuffer handles uneven packet arrival.
+        prebufferBytes = (SAMPLE_RATE * 2 * PREBUFFER_MILLIS / 1_000).toInt(),
+        prebufferWaitMillis = PREBUFFER_MILLIS,
+        trackResponse = trackResponse,
+        // Route changes/backpressure may last longer than the old 200 ms stall budget.
+        maxZeroWrites = 400
     )
 
     fun start() {
@@ -76,6 +84,7 @@ class AudioPlayerHelper {
         }
     }
     fun clearQueue() { controller.clear() }
+    fun finishResponse() { controller.finishResponse() }
     fun stop() { controller.stop() }
     fun isPlaying(): Boolean = controller.isRunning()
     fun isActuallySpeaking(): Boolean = controller.isSpeaking()
@@ -102,11 +111,29 @@ private class AndroidPcmSink : PcmPlaybackSink {
         }
         track = candidate
     }
+    @Volatile private var totalBytesWritten = 0L
+
     override fun play() { track.play() }
-    override fun write(bytes: ByteArray, offset: Int, count: Int): Int =
-        track.write(bytes, offset, count, AudioTrack.WRITE_NON_BLOCKING)
+    override fun write(bytes: ByteArray, offset: Int, count: Int): Int {
+        val written = track.write(bytes, offset, count, AudioTrack.WRITE_NON_BLOCKING)
+        if (written > 0) totalBytesWritten += written
+        return written
+    }
     override fun pause() { track.pause() }
-    override fun flush() { track.flush() }
-    override fun stop() { track.stop() }
+    override fun flush() { 
+        track.flush()
+        totalBytesWritten = 0L
+    }
+    override fun stop() { 
+        track.stop() 
+        totalBytesWritten = 0L
+    }
     override fun release() { track.release() }
+
+    override fun hasPendingHardwareDrain(): Boolean {
+        if (track.playState != AudioTrack.PLAYSTATE_PLAYING) return false
+        val headFrames = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+        val writtenFrames = totalBytesWritten / 2L
+        return headFrames < writtenFrames
+    }
 }

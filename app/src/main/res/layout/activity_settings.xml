@@ -250,12 +250,30 @@
         </LinearLayout>
         <Button android:id="@+id/btnSave" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="8dp" android:layout_marginBottom="14dp" android:background="@drawable/bg_button_primary" android:text="Save Settings" android:textColor="@color/white" android:textSize="16sp" android:fontFamily="sans-serif-medium" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="🔒 Your API keys are stored securely on your device" android:textColor="@color/assistant_text_muted" android:textSize="12sp" android:layout_marginBottom="24dp" />
-        <Button android:id="@+id/btnNativeAgent" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:minHeight="48dp" android:text="လက်ထောက်အသံနှင့် ဖုန်းခွင့်ပြုချက်များ" android:textSize="15sp"
-            android:layout_marginBottom="12dp" android:textAllCaps="false" />
-        <Button android:id="@+id/btnSleepWake" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:minHeight="48dp" android:text="အိပ်စက်ချိန်နှင့် အသံနှိုးစက်" android:textSize="15sp"
-            android:layout_marginBottom="12dp" android:textAllCaps="false" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNativeAgent"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_card"
+            android:text="လက်ထောက်အသံနှင့် ဖုန်းခွင့်ပြုချက်များ"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:layout_marginBottom="12dp"
+            android:textAllCaps="false"
+            app:cornerRadius="16dp"
+            app:backgroundTint="@null" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSleepWake"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:background="@drawable/bg_card"
+            android:text="အိပ်စက်ချိန်နှင့် အသံနှိုးစက်"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:layout_marginBottom="12dp"
+            android:textAllCaps="false"
+            app:cornerRadius="16dp"
+            app:backgroundTint="@null" />
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/btnAutomationHub" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginBottom="12dp" android:clickable="true" android:focusable="true"
@@ -301,13 +319,19 @@
             android:text="Manual proactive simulation / စမ်းသပ်စည်းမျဉ်းများ"
             android:textAllCaps="false" />
         </LinearLayout>
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAppUpdates"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginBottom="24dp"
+            android:background="@drawable/bg_card"
             android:drawableStart="@android:drawable/ic_popup_sync"
-            android:text="App updates"
-            android:textAllCaps="false" />
+            android:drawableTint="@color/assistant_primary_light"
+            android:text="အက်ပ် ဗားရှင်း အပ်ဒိတ် စစ်ဆေးရန် (App Updates)"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            app:cornerRadius="16dp"
+            app:backgroundTint="@null" />
     </LinearLayout>
 </ScrollView>

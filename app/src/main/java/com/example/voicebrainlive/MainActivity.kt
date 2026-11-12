@@ -1,6 +1,7 @@
 package com.example.voicebrainlive
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -188,6 +189,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             checkAndRequestPermissions()
+            checkAppUpdateInBackground()
         } catch (t: Throwable) {
             Log.e("MainActivity", "FATAL in onCreate", t)
             finish()
@@ -473,6 +475,59 @@ class MainActivity : AppCompatActivity() {
                 viewModel.updateStatus(getString(R.string.background_voice_unavailable))
             }
         }
+    }
+
+    private fun checkAppUpdateInBackground() {
+        if (!NetworkUtils.isOnline(this)) return
+        mainScope.launch(Dispatchers.IO) {
+            try {
+                val provider = com.example.voicebrainlive.updates.ReleaseSource.provider(packageName)
+                val checker = com.example.voicebrainlive.updates.UpdateChecker(
+                    packageName = packageName,
+                    installedVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                    provider = provider
+                )
+                val status = checker.check()
+                if (status is com.example.voicebrainlive.updates.UpdateStatus.Available) {
+                    val rel = status.release
+                    val prefs = getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+                    val dismissedCode = prefs.getLong("dismissed_update_code", -1)
+                    if (dismissedCode < rel.androidVersionCode) {
+                        withContext(Dispatchers.Main) {
+                            if (!isFinishing && !isDestroyed) {
+                                showUpdateAvailableDialog(rel)
+                            }
+                            com.example.voicebrainlive.updates.AppUpdateNotifier.notifyUpdateAvailable(this@MainActivity, rel)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Background update check should never disrupt app startup
+            }
+        }
+    }
+
+    private fun showUpdateAvailableDialog(release: com.example.voicebrainlive.updates.ReleaseManifest) {
+        val sizeMb = release.apkBytes / (1024.0 * 1024.0)
+        val notes = if (release.releaseNotes.isNotBlank()) "\n\n📌 အသစ်ပါဝင်သော အချက်များ:\n${release.releaseNotes}" else ""
+        val message = "လက်ရှိ ဗားရှင်း: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})\n" +
+                "ဗားရှင်းအသစ်: v${release.androidVersionName} (Build ${release.androidVersionCode})\n" +
+                "ဒေါင်းလုဒ် အရွယ်အစား: %.1f MB".format(sizeMb) + notes
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("📢 ဗားရှင်းအသစ် ရရှိနေပါပြီ (v${release.androidVersionName})")
+            .setMessage(message)
+            .setPositiveButton("ယခု Update တင်မည်") { _, _ ->
+                startActivity(Intent(this, com.example.voicebrainlive.updates.AppUpdateActivity::class.java))
+            }
+            .setNegativeButton("နောက်မှ လုပ်မည်") { dialog, _ ->
+                getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putLong("dismissed_update_code", release.androidVersionCode)
+                    .apply()
+                dialog.dismiss()
+            }
+            .show()
     }
 
     override fun onDestroy() {

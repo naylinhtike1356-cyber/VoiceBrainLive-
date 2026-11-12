@@ -19,6 +19,7 @@ internal class ByteBoundedPcmQueue(private val maxBytes: Int, private val maxChu
     private val monitor = Object()
     private val chunks = ArrayDeque<Chunk>()
     private var active: Token? = null
+    private var inputComplete = false
     private var bytes = 0
     private var accepted = 0L
     private var rejected = 0L
@@ -29,6 +30,7 @@ internal class ByteBoundedPcmQueue(private val maxBytes: Int, private val maxChu
 
     fun open(): Token = synchronized(monitor) {
         discardQueued()
+        inputComplete = false
         Token().also { active = it; monitor.notifyAll() }
     }
 
@@ -43,6 +45,7 @@ internal class ByteBoundedPcmQueue(private val maxBytes: Int, private val maxChu
             else -> Admission.ACCEPTED
         }
         if (result == Admission.ACCEPTED) {
+            inputComplete = false
             // Copy only after size validation; producers may reuse capture buffers.
             chunks.addLast(Chunk(token, pcm.copyOf()))
             bytes += pcm.size
@@ -60,8 +63,10 @@ internal class ByteBoundedPcmQueue(private val maxBytes: Int, private val maxChu
 
     /** Blocking only on the playback thread. Close/open wakes waits; interruption propagates. */
     @Throws(InterruptedException::class)
-    fun await(token: Token, timeoutMillis: Long): Chunk? {
+    fun await(token: Token, timeoutMillis: Long, minBufferedBytes: Int = 2,
+        bufferWaitMillis: Long = 0): Chunk? {
         require(timeoutMillis in 0..60_000)
+        require(minBufferedBytes >= 2 && bufferWaitMillis in 0..1_000)
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
         return synchronized(monitor) {
             while (active === token && chunks.isEmpty()) {
@@ -69,7 +74,22 @@ internal class ByteBoundedPcmQueue(private val maxBytes: Int, private val maxChu
                 if (remaining <= 0L) break
                 TimeUnit.NANOSECONDS.timedWait(monitor, remaining)
             }
+            // Start the jitter budget with the first packet, not while the stream is idle.
+            val bufferDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(bufferWaitMillis)
+            while (active === token && bytes > 0 && bytes < minBufferedBytes && !inputComplete) {
+                val remaining = bufferDeadline - System.nanoTime()
+                if (remaining <= 0L) break
+                TimeUnit.NANOSECONDS.timedWait(monitor, remaining)
+            }
             removeFirst(token)
+        }
+    }
+
+    /** A short final response must not wait for a prebuffer threshold it can never reach. */
+    fun finish(token: Token) = synchronized(monitor) {
+        if (active === token) {
+            inputComplete = true
+            monitor.notifyAll()
         }
     }
 

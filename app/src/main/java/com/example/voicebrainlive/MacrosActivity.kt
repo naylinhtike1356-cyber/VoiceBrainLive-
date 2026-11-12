@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.recyclerview.widget.RecyclerView
 import com.example.voicebrainlive.commands.AutomationCommandValidator
+import com.example.voicebrainlive.commands.MacroDefinitions
 import com.example.voicebrainlive.databinding.ActivityMacrosBinding
 
 class MacrosActivity : ComponentActivity() {
@@ -46,7 +47,8 @@ class MacrosActivity : ComponentActivity() {
             val item = items[position]
             holder.tvName.text = item.name
             holder.tvStatus.setText(if (AutomationCommandValidator.validateSequence(item.sequence).valid) R.string.hub_macro_active else R.string.hub_macro_invalid)
-            holder.tvSequence.text = item.sequence.replace(";", "; ")
+            holder.tvSequence.text = MacroDefinitions.preview(item.sequence)
+            holder.tvStatus.contentDescription = holder.tvStatus.text
             holder.itemView.setOnClickListener { onClick(item) }
             holder.btnDelete.setOnClickListener { onDelete(item) }
         }

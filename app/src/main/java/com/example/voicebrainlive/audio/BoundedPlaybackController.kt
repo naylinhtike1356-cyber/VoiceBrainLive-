@@ -9,23 +9,32 @@ internal interface PcmPlaybackSink {
     fun flush()
     fun stop()
     fun release()
+    fun hasPendingHardwareDrain(): Boolean = false
 }
 
 /** Pure JVM ownership/buffering policy. Native audio behavior is outside this contract. */
 internal class BoundedPlaybackController(
     private val sinkFactory: () -> PcmPlaybackSink,
-    private val maxQueuedBytes: Int = 96_000,
-    maxQueuedChunks: Int = 128,
+    private val maxQueuedBytes: Int = 2_000_000,
+    maxQueuedChunks: Int = 2048,
     private val writeSliceBytes: Int = 4_096,
     private val maxZeroWrites: Int = 40,
     private val zeroWriteDelayMillis: Long = 5,
     private val stopJoinMillis: Long = 100,
     private val onWorkerStart: () -> Unit = {},
-    private val onError: (Error) -> Unit = {}
+    private val onError: (Error) -> Unit = {},
+    private val prebufferBytes: Int = 0,
+    private val prebufferWaitMillis: Long = 240,
+    private val trackResponse: Boolean = false,
+    private val responseIdleTimeoutMillis: Long = 15_000,
+    private val acousticTailMillis: Long = 350,
+    private val nanoTime: () -> Long = System::nanoTime
 ) {
     init {
         require(maxQueuedBytes >= 2 && writeSliceBytes > 0 && writeSliceBytes % 2 == 0)
         require(maxZeroWrites > 0 && zeroWriteDelayMillis in 1..100 && stopJoinMillis in 0..1_000)
+        require(prebufferBytes in 0..maxQueuedBytes && prebufferBytes % 2 == 0)
+        require(prebufferWaitMillis in 0..1_000 && responseIdleTimeoutMillis > 0 && acousticTailMillis >= 0)
     }
     enum class Error { INITIALIZATION, WRITE_FAILED, WRITE_STALLED, SINK_EXCEPTION, CLEANUP_FAILED, RETIRING_WRITER }
     enum class Start { STARTED, ALREADY_RUNNING, RETIRING }
@@ -39,6 +48,10 @@ internal class BoundedPlaybackController(
     private class Run(@Volatile var token: ByteBoundedPcmQueue.Token) {
         @Volatile var cancelled = false
         @Volatile var inFlight = false
+        @Volatile var hardwarePending = false
+        var responseOpen = false
+        var lastOfferNanos = 0L
+        var lastAudibleNanos: Long? = null
         lateinit var worker: Thread
     }
 
@@ -80,7 +93,19 @@ internal class BoundedPlaybackController(
         if (active !== producer.owner) {
             return@synchronized queue.offer(producer.token, bytes)
         }
-        queue.offer(producer.token, bytes)
+        queue.offer(producer.token, bytes).also { admission ->
+            if (admission == ByteBoundedPcmQueue.Admission.ACCEPTED) {
+                active?.responseOpen = trackResponse
+                active?.lastOfferNanos = nanoTime()
+            }
+        }
+    }
+
+    fun finishResponse() = synchronized(lock) {
+        active?.let { run ->
+            run.responseOpen = false
+            queue.finish(run.token)
+        }
     }
 
     fun rejectEncodedInput() = synchronized(lock) { rejectedEncodedInputs++ }
@@ -89,6 +114,8 @@ internal class BoundedPlaybackController(
     /** Immediate Java generation revocation; native pause/flush is acknowledged by worker later. */
     fun clear(): Producer? = synchronized(lock) {
         val run = active ?: return@synchronized null
+        run.responseOpen = false
+        run.lastAudibleNanos = null
         run.token = queue.open()
         run.worker.interrupt()
         Producer(run, run.token)
@@ -115,9 +142,14 @@ internal class BoundedPlaybackController(
     }
 
     fun isRunning(): Boolean = synchronized(lock) { active != null }
-    /** Covers Java queued/in-flight PCM, not AudioTrack's audible hardware drain. */
+    /** Includes provider packet gaps, worker-observed hardware drain and the acoustic echo tail. */
     fun isSpeaking(): Boolean = synchronized(lock) {
-        active?.inFlight == true || (active != null && queue.snapshot().queuedChunks > 0)
+        val run = active ?: return@synchronized false
+        val now = nanoTime()
+        val idleTimeout = if (queue.snapshot().queuedChunks == 0 && !run.inFlight && !run.hardwarePending) 2_000L else responseIdleTimeoutMillis
+        run.inFlight || run.hardwarePending || queue.snapshot().queuedChunks > 0 ||
+            (run.responseOpen && now - run.lastOfferNanos < idleTimeout * 1_000_000) ||
+            (run.lastAudibleNanos?.let { now - it < acousticTailMillis * 1_000_000 } == true)
     }
 
     fun snapshot(): Snapshot = synchronized(lock) {
@@ -142,10 +174,16 @@ internal class BoundedPlaybackController(
                 if (observedToken !== token) {
                     sink.pause()
                     sink.flush()
+                    run.hardwarePending = false
                     observedToken = token
                     started = false
                 }
-                val chunk = try { queue.await(token, 150) }
+                // All native track calls, including drain inspection, stay on its owner thread.
+                run.hardwarePending = sink.hasPendingHardwareDrain()
+                if (run.hardwarePending) synchronized(lock) { run.lastAudibleNanos = nanoTime() }
+                val needsBuffer = prebufferBytes > 0 && !started
+                val chunk = try { queue.await(token, 150,
+                    if (needsBuffer) prebufferBytes else 2, if (needsBuffer) prebufferWaitMillis else 0) }
                 catch (_: InterruptedException) { continue }
                 if (chunk == null) continue
                 run.inFlight = true
@@ -170,6 +208,8 @@ internal class BoundedPlaybackController(
                             } else {
                                 synchronized(lock) {
                                     writtenBytes += written
+                                    run.hardwarePending = true
+                                    run.lastAudibleNanos = nanoTime()
                                     if (written < count) partialWrites++
                                 }
                                 offset += written
@@ -196,6 +236,7 @@ internal class BoundedPlaybackController(
                 }
             }
             synchronized(lock) {
+                run.hardwarePending = false
                 if (active === run) {
                     queue.close(run.token)
                     active = null

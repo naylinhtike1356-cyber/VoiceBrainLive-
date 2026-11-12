@@ -22,7 +22,9 @@ object FocusMode {
     }
 
     fun isActive(context: Context): Boolean {
-        val end = prefs(context).getLong(KEY_END_TIME, 0)
+        val end = endTimeMillis(context)
         return end > System.currentTimeMillis()
     }
+
+    fun endTimeMillis(context: Context): Long = prefs(context).getLong(KEY_END_TIME, 0)
 }

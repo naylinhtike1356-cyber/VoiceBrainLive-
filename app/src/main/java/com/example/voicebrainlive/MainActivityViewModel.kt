@@ -132,6 +132,8 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
             { phoneExecutor === executor },executor::executeAsync)?.let{return@withContext formatLocalCommandResult(it)}
         com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
             { phoneExecutor === executor }, executor::executeAsync)?.let { return@withContext formatLocalCommandResult(it) }
+        com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,
+            { phoneExecutor === executor }, executor::executeAsync)?.let { return@withContext it }
         tryFastPathCommand(text)?.let { return@withContext formatLocalCommandResult(it.resultMessage) }
 
         val match = OfflineCommandMatcher.match(text)
@@ -161,6 +163,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
             val reviewedCall=com.example.voicebrainlive.commands.ReviewedCallInput.target(trimmed)!=null
             val direct = com.example.voicebrainlive.commands.ReviewedCallInput.execute(trimmed,
                 { phoneExecutor === executor },executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(trimmed,
+                { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(trimmed,
                 { phoneExecutor === executor }, executor::executeAsync)
             if (direct != null) {
                 if (phoneExecutor !== executor) return@launch
@@ -244,20 +247,23 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun formatLocalCommandResult(result: String): String {
-        if (!result.startsWith("WEATHER_DATA|")) return result
-        val parts = result.split("|")
-        if (parts.size < 9) return result
-        return WeatherNarrative.current(
-            location = parts.getOrNull(1).orEmpty(),
-            temperature = parts.getOrNull(2)?.toIntOrNull() ?: 0,
-            minTemp = parts.getOrNull(3)?.toIntOrNull() ?: 0,
-            maxTemp = parts.getOrNull(4)?.toIntOrNull() ?: 0,
-            weatherCode = parts.getOrNull(5)?.toIntOrNull() ?: 0,
-            isRainExpected = parts.getOrNull(6)?.toBooleanStrictOrNull() ?: false,
-            humidity = parts.getOrNull(7)?.toIntOrNull() ?: 0,
-            windSpeed = parts.getOrNull(8)?.toDoubleOrNull() ?: 0.0,
-            rainSummary = parts.getOrNull(10).orEmpty()
-        )
+        if (result.startsWith("WEATHER_DATA|")) {
+            val parts = result.split("|")
+            if (parts.size >= 9) {
+                return WeatherNarrative.current(
+                    location = parts.getOrNull(1).orEmpty(),
+                    temperature = parts.getOrNull(2)?.toIntOrNull() ?: 0,
+                    minTemp = parts.getOrNull(3)?.toIntOrNull() ?: 0,
+                    maxTemp = parts.getOrNull(4)?.toIntOrNull() ?: 0,
+                    weatherCode = parts.getOrNull(5)?.toIntOrNull() ?: 0,
+                    isRainExpected = parts.getOrNull(6)?.toBooleanStrictOrNull() ?: false,
+                    humidity = parts.getOrNull(7)?.toIntOrNull() ?: 0,
+                    windSpeed = parts.getOrNull(8)?.toDoubleOrNull() ?: 0.0,
+                    rainSummary = parts.getOrNull(10).orEmpty()
+                )
+            }
+        }
+        return com.example.voicebrainlive.commands.CommandResultFormatter.format(result)
     }
 
     /**
@@ -339,7 +345,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         audioRecorder = AudioRecorderHelper().apply {
             useVoiceCommunicationForNoisyEnv = SettingsActivity.isNoisyEnvMode(app)
         }
-        audioPlayer = AudioPlayerHelper().apply {
+        audioPlayer = AudioPlayerHelper(trackResponse = true).apply {
             onError = { message ->
                 _statusMessage.value = message
                 _uiState.update { AssistantState.Error(message) }
@@ -667,6 +673,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
 
     fun onTurnCompleteOrInterrupted() {
         val player = audioPlayer
+        player.finishResponse()
         playbackDrainLease.replace { token ->
             playbackDrainJob?.cancel()
             playbackDrainJob = viewModelScope.launch(Dispatchers.IO) {
@@ -695,9 +702,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
             if (focusUnavailableForTurn) return@replace
             if (isFirstAudioChunkOfTurn) {
                 if (!AudioFocusHelper.requestForSpeech(app, player)) {
-                    focusUnavailableForTurn = true
-                    player.onError?.invoke("Audio focus unavailable; text response remains available.")
-                    return@replace
+                    Log.w("MainActivityVM", "AudioFocus not granted; continuing audio playback")
                 }
                 isFirstAudioChunkOfTurn = false
             }

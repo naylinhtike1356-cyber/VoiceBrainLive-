@@ -30,8 +30,21 @@ fun MacroRunResult.renderLegacy(): String {
     // WAITING has no meaningful grant unless the actual guard produced it.
     if (status == MacroOutcomeStatus.WAITING_FOR_APPROVAL && !captured.startsWith(prefix))
         return "BLOCKED: Approval preparation lacked a captured common-guard result. $summary $captured"
-    return if (captured.startsWith(prefix)) "$captured\nMacro status: $summary"
+    val legacy = if (captured.startsWith(prefix)) "$captured\nMacro status: $summary"
         else "$prefix $summary $captured"
+    if (observations.isEmpty()) return legacy
+    val steps = observations.mapIndexed { index, observation ->
+        val label = MacroDefinitions.preview(observation.command).removePrefix("1. ")
+        val status = when (observation.result.status) {
+            MacroOutcomeStatus.VERIFIED -> "စက်အခြေအနေ ပြန်စစ်ပြီး"
+            MacroOutcomeStatus.WAITING_FOR_APPROVAL -> "အတည်ပြုချက် စောင့်နေသည်"
+            MacroOutcomeStatus.BLOCKED -> "ရပ်ထားသည်"
+            MacroOutcomeStatus.FAILED -> "မအောင်မြင်ပါ"
+            else -> "ရလဒ် အတည်မပြုနိုင်သေးပါ"
+        }
+        "${index + 1}. $label · $status"
+    }.joinToString("\n")
+    return "$legacy\nလုပ်ဆောင်ခဲ့သော အဆင့်များ\n$steps"
 }
 
 /** String presence/handled/completed text cannot prove that an effect happened. */
@@ -107,13 +120,13 @@ class BoundedMacroRunner(
             lastObserved = after
             val result = when {
                 after < before || after >= deadline -> MacroLeafResult(MacroOutcomeStatus.OUTCOME_UNKNOWN, "LATE_RESULT_NO_RETRY")
-                leaf.risk == MacroLeafRisk.SENSITIVE && raw.status == MacroOutcomeStatus.VERIFIED ->
+                leaf.risk == MacroLeafRisk.SENSITIVE && (raw.status == MacroOutcomeStatus.VERIFIED || raw.status == MacroOutcomeStatus.COMPLETED) ->
                     MacroLeafResult(MacroOutcomeStatus.BLOCKED, "SENSITIVE_LEAF_MUST_STOP_AT_GUARD")
-                raw.status == MacroOutcomeStatus.COMPLETED -> MacroLeafResult(MacroOutcomeStatus.UNVERIFIED, "INVALID_LEAF_COMPLETION_CONTRACT")
                 else -> raw
             }
             observations += MacroStepObservation(leaf.command, result)
-            if (result.status != MacroOutcomeStatus.VERIFIED || leaf.risk != MacroLeafRisk.SAFE) {
+            val isSuccess = result.status == MacroOutcomeStatus.VERIFIED || result.status == MacroOutcomeStatus.COMPLETED
+            if (!isSuccess || leaf.risk != MacroLeafRisk.SAFE) {
                 return MacroRunResult(result.status, "STOPPED_NO_AUTOMATIC_RESUME_OR_RETRY", calls, observations.toList())
             }
         }

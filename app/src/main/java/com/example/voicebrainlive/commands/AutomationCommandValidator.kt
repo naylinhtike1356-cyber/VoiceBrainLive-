@@ -37,7 +37,7 @@ object AutomationCommandValidator {
             if (target.length > MAX_ARGUMENT_CHARS || value.length > MAX_ARGUMENT_CHARS) {
                 return ValidationResult(false, "Step ${index + 1} ၏ argument သည် အလွန်ရှည်နေပါသည်။")
             }
-            if (!allowApprovalRequired && CommandSafetyPolicy.requiresConfirmation(command)) {
+            if (!allowApprovalRequired && CommandSafetyPolicy.requiresAutomationConfirmation(command)) {
                 return ValidationResult(false, "Step ${index + 1} ($command) သည် user confirmation လိုအပ်သောကြောင့် automatic macro တွင် မထည့်နိုင်ပါ။")
             }
         }
@@ -50,7 +50,7 @@ object AutomationCommandValidator {
         var remaining = sequence
         while (remaining.isNotBlank()) {
             val command = remaining.substringBefore(':').substringBefore(';').trim()
-            if (CommandSafetyPolicy.requiresConfirmation(command)) {
+            if (CommandSafetyPolicy.requiresAutomationConfirmation(command)) {
                 steps += remaining
                 break
             }

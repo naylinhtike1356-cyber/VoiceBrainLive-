@@ -176,4 +176,38 @@ class AgentActivityInboxTest {
         activity.findViewById<android.view.View>(android.R.id.content).findViewWithTag<Button>("inbox_cancel_brain:task").performClick()
         assertEquals(1, InboxTestActivity.mutations); controller.pause().stop().destroy()
     }
+
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    @Config(qualifiers="w360dp-h800dp-notnight-mdpi")
+    fun renderGroupedInboxWithLargeBurmeseText() {
+        org.robolectric.RuntimeEnvironment.setFontScale(1.5f)
+        fun row(id:String,state:PersistentTaskState,title:String)=AgentInboxRow(id,id,1,InboxSource.BRAIN,state,title,
+            "Fixture detail; no provider accessed","စက်တွင်း အလုပ်",null)
+        InboxTestActivity.fixture=AgentActivityInboxState(listOf(
+            row("done",PersistentTaskState.COMPLETED,"ယခင်အလုပ် မှတ်တမ်း"),
+            row("pending",PersistentTaskState.DRAFT,"နောက်လုပ်မည့် အလုပ် စီစဉ်ရန်"),
+            row("running",PersistentTaskState.RUNNING,"မနက်ခင်း အလုပ်များ ပြင်ဆင်ရန်")))
+        val controller=Robolectric.buildActivity(InboxTestActivity::class.java).setup()
+        val root=controller.get().findViewById<android.view.View>(android.R.id.content)
+        shadowOf(Looper.getMainLooper()).idle()
+        root.measure(android.view.View.MeasureSpec.makeMeasureSpec(360,android.view.View.MeasureSpec.EXACTLY),
+            android.view.View.MeasureSpec.makeMeasureSpec(800,android.view.View.MeasureSpec.EXACTLY))
+        root.layout(0,0,360,800)
+        val rows=root.findViewWithTag<android.widget.LinearLayout>("inbox_rows")
+        assertEquals("inbox_section_0",rows.getChildAt(0).tag)
+        assertEquals("inbox_card_running",rows.getChildAt(1).tag)
+        val runningTitle=(rows.getChildAt(1) as android.widget.LinearLayout).getChildAt(0) as TextView
+        assertNotEquals(android.graphics.Color.BLACK,runningTitle.currentTextColor)
+        val visibleTitle=android.graphics.Rect()
+        assertTrue("Running work must be visible at large font scale",runningTitle.getGlobalVisibleRect(visibleTitle))
+        assertTrue(root.findViewWithTag<TextView>("inbox_next_pending").text.contains("မလုပ်ဆောင်ရသေး"))
+        val bitmap=android.graphics.Bitmap.createBitmap(360,800,android.graphics.Bitmap.Config.ARGB_8888)
+        root.draw(android.graphics.Canvas(bitmap))
+        val output=java.io.File("build/automation-hub-captures/agent-inbox-phone.png")
+        output.parentFile!!.mkdirs()
+        output.outputStream().use { assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)) }
+        bitmap.recycle()
+        controller.pause().stop().destroy()
+        assertEquals(0,InboxTestActivity.mutations)
+    }
 }

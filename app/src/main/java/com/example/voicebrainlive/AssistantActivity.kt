@@ -346,7 +346,7 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
     }
 
     private fun showTranscript(text: String) {
-        composeTranscriptText = text
+        composeTranscriptText = com.example.voicebrainlive.commands.CommandResultFormatter.format(text)
     }
 
 

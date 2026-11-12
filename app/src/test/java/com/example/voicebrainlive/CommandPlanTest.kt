@@ -15,6 +15,15 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class CommandPlanTest {
     @Test
+    fun directCommandWithoutConfirmationStillNeedsExplicitTarget() {
+        listOf("make_call", "dial", "call_quick_contact", "send_sms", "reply_messenger", "whatsapp").forEach { command ->
+            assertFalse(command, CommandPlanValidator.validate(
+                CommandPlan(command, target = null, value = "hello", requiresConfirmation = false)
+            ).valid)
+        }
+    }
+
+    @Test
     fun normalizeUserText_convertsBurmeseDigitsAndWhitespace() {
         assertEquals("မနက် 7 နာရီ", normalizeUserText("  မနက်   ၇   နာရီ၊  "))
     }

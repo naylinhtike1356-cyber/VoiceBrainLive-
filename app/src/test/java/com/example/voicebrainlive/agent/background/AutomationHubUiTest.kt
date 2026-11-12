@@ -168,6 +168,61 @@ class AutomationHubUiTest {
         assertSame(binding.btnAppUpdates, parent.getChildAt(parent.childCount - 1))
     }
 
+    @Test fun openingEmptyMacroTabNeverCreatesOrRestoresDefinitions() {
+        val prefs=app.getSharedPreferences("custom_macros",0)
+        val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
+        tab(c.get(),2)
+        assertTrue(prefs.all.isEmpty())
+        assertEquals(0,rows(c.get(),R.id.recyclerMacros).adapter!!.itemCount)
+        c.pause().stop().destroy()
+    }
+
+    @Test fun duplicateMacroNameDoesNotOverwriteAndPreviewShowsSteps() {
+        val prefs=app.getSharedPreferences("custom_macros",0)
+        prefs.edit().putString("Meeting Mode","mute").commit()
+        val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
+        tab(c.get(),2)
+        tagged<View>(root(c.get()),"hub_macro_add").performClick()
+        val form=dialog()
+        tagged<EditText>(form.window!!.decorView,"macro_name").setText(" MEETING MODE ")
+        tagged<EditText>(form.window!!.decorView,"macro_sequence").setText("volume_up;volume_down")
+        val preview=tagged<android.widget.TextView>(form.window!!.decorView,"macro_step_preview").text.toString()
+        assertTrue(preview.contains("1."));assertTrue(preview.contains("2."));assertFalse(preview.contains("volume_up"))
+        form.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        assertTrue(form.isShowing)
+        assertEquals("mute",prefs.getString("Meeting Mode",null))
+        assertFalse(prefs.contains("meeting mode"))
+        c.pause().stop().destroy()
+    }
+
+    @Test fun pendingWorkIsGroupedAndWorkerChangesRefreshWhileVisible() = runBlocking<Unit> {
+        val scheduled=app.scheduledRequests.queueAccepted(app.scheduledRequests.create(RequestKind.AI_GOAL,"upcoming","","",app.now+60_000))
+        val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
+        val a=c.get()
+        until { root(a).findViewWithTag<View>("requests_section_UPCOMING")!=null }
+        app.now=scheduled.dueAt
+        app.scheduledRequests.due(scheduled.id,scheduled.revision)
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
+        until { root(a).findViewWithTag<View>("requests_section_ATTENTION")!=null }
+        assertNotNull(root(a).findViewWithTag<View>("requests_review_${scheduled.id}"))
+        assertTrue(tagged<android.widget.TextView>(root(a),"requests_next_${scheduled.id}").text.contains("မလုပ်ဆောင်ရသေး"))
+        c.pause().stop().destroy()
+    }
+
+    @Test fun preparedDraftCanBeReopenedWithoutResubmittingWork() = runBlocking<Unit> {
+        val scheduled=app.scheduledRequests.queueAccepted(app.scheduledRequests.create(RequestKind.AI_GOAL,"my draft","","",app.now+60_000))
+        app.now=scheduled.dueAt
+        val ready=app.scheduledRequests.due(scheduled.id,scheduled.revision)!!
+        app.scheduledRequests.finish(app.scheduledRequests.claimReviewed(ready){true},true)
+        val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
+        until { root(c.get()).findViewWithTag<View>("requests_draft_${scheduled.id}")!=null }
+        tagged<View>(root(c.get()),"requests_draft_${scheduled.id}").performClick()
+        assertEquals(scheduled.id,Shadows.shadowOf(c.get()).nextStartedActivity.getStringExtra("scheduled_draft_id"))
+        assertEquals(RequestState.DRAFT_READY,app.scheduledRequests.history().single().state)
+        assertTrue(app.enqueued.isEmpty())
+        c.pause().stop().destroy()
+    }
+
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Config(qualifiers = "w360dp-h800dp-notnight-mdpi")
     fun renderHubPhoneWithLargeBurmeseText() = capture(360, 800, "phone", 1.5f)
@@ -179,7 +234,7 @@ class AutomationHubUiTest {
         capture(1000, 700, "tablet-light", 1f)
     }
 
-    private fun capture(width: Int, height: Int, name: String, fontScale: Float) {
+    private fun capture(width: Int, height: Int, name: String, fontScale: Float) = runBlocking<Unit> {
         RuntimeEnvironment.setFontScale(fontScale)
         app.scheduledRequests.queueAccepted(app.scheduledRequests.create(RequestKind.AI_GOAL, "မနက်ခင်း အလုပ်များ စီစဉ်ရန်", "", "", app.now + 300_000))
         RoutineStorage.add(app, "weather", 7, 30)
@@ -187,6 +242,7 @@ class AutomationHubUiTest {
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
         val root = root(a)
+        until { root.findViewWithTag<View>("requests_section_UPCOMING")!=null }
         for (index in 0..2) {
             tab(a, index)
             root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))

@@ -63,6 +63,7 @@ class TtsUnifiedInterface(
     private var tts: TextToSpeech? = null
     private var isInitialized = false
     private var onSpeakingComplete: (() -> Unit)? = null
+    private var onInitCallback: (() -> Unit)? = null
 
     init {
         // Legacy interfaces are retained, but speech now wakes the native-audio agent.
@@ -70,7 +71,16 @@ class TtsUnifiedInterface(
         activeInstances.add(this)
     }
 
-    private fun initializeTts() {
+    fun initializeTts(onReady: (() -> Unit)? = null) {
+        if (isInitialized && tts != null) {
+            onReady?.invoke()
+            return
+        }
+        if (onReady != null) {
+            onInitCallback = onReady
+        }
+        if (tts != null) return
+
         tts = TextToSpeech(appContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val burmeseLocale = DEFAULT_LANGUAGE
@@ -86,8 +96,14 @@ class TtsUnifiedInterface(
                 
                 isInitialized = true
                 Log.d(TAG, "TTS initialized successfully")
+                val cb = onInitCallback
+                onInitCallback = null
+                cb?.invoke()
             } else {
                 Log.e(TAG, "TTS initialization failed")
+                val cb = onInitCallback
+                onInitCallback = null
+                cb?.invoke()
             }
         }
         
@@ -113,7 +129,9 @@ class TtsUnifiedInterface(
                     needsLanguageReset = false
                 }
                 
-                onSpeakingComplete?.invoke()
+                val cb = onSpeakingComplete
+                onSpeakingComplete = null
+                cb?.invoke()
                 Handler(Looper.getMainLooper()).post {
                     // Double-check resets in case utterance ID didn't match
                     if (needsPitchReset) {
@@ -133,9 +151,35 @@ class TtsUnifiedInterface(
 
             override fun onError(utteranceId: String?) {
                 Log.e(TAG, "TTS error: $utteranceId")
-                onSpeakingComplete?.invoke()
+                val cb = onSpeakingComplete
+                onSpeakingComplete = null
+                cb?.invoke()
             }
         })
+    }
+
+    /** Direct local audio playback without microphone FGS delegation. */
+    fun speakLocalDirect(text: String, isCalm: Boolean = true, onDone: (() -> Unit)? = null) {
+        if (text.isBlank()) {
+            onDone?.invoke()
+            return
+        }
+        if (!isInitialized || tts == null) {
+            initializeTts {
+                speakLocalDirect(text, isCalm, onDone)
+            }
+            return
+        }
+        onSpeakingComplete = onDone
+        if (isCalm) {
+            tts?.setSpeechRate(0.9f)
+            tts?.setPitch(0.95f)
+            needsSpeechRateReset = true
+            needsPitchReset = true
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "${UTTERANCE_ID}_calm")
+        } else {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        }
     }
 
     fun speak(text: String) {

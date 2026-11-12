@@ -166,7 +166,9 @@ class SleepWakeCommands(private val context:Context,private val dispatch:suspend
                     (it.state==SleepWakeState.RUNNING||it.clockRequested&&now-it.due in 0..600_000L)}
                 val ids=(ringing.map{it.id}+listOfNotNull(active)).distinct()
                 ids.forEach{id->try{j?.mark(id,SleepWakeState.DISMISSED)}catch(_:Exception){};SleepWakeGraph.requestClock(context,SleepWakeGraph.clockDismiss(id))}
-                if(ids.isEmpty())"ဤအက်ပ်မှ ဖန်တီးထားသော နှိုးစက် ယခု မမြည်နေပါ။ အခြားနှိုးစက်ကို Clock မှ ရပ်ပါ။"
+                if(ids.isEmpty()){
+                    return "ဤအက်ပ်မှ ဖန်တီးထားသော နှိုးစက် ယခု မမြည်နေပါ။"
+                }
                 else "Luma နှိုးစကားကို ရပ်ထားပြီး Clock ထံ ပိတ်ရန် တောင်းဆိုထားသည်။ Clock မရပ်လျှင် ၎င်း၏ ရပ်ရန်ခလုတ်ကို နှိပ်ပါ။"
             }
             else->null

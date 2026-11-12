@@ -5,10 +5,15 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import com.example.voicebrainlive.VoiceLiveService
+import com.example.voicebrainlive.tts.TtsUnifiedInterface
 import org.json.JSONObject
 import java.util.UUID
 
-/** Compatibility speech requests wake the real native-audio agent. No Android TTS engine is initialized. */
+/**
+ * Handles agent speech requests.
+ * Active foreground sessions route to VoiceLiveService.
+ * Background requests route to playback-only TTS to prevent Android 12+ microphone FGS launch rejection.
+ */
 object AgentSpeech {
     const val ENABLED = true
     const val EXTRA_TICKET = "agent_speech_ticket"
@@ -31,14 +36,20 @@ object AgentSpeech {
             action = VoiceLiveService.ACTION_START
             putExtra("EXTRA_START_WITH_CARD", true)
             putExtra(EXTRA_TICKET, request.id)
-            // A newly woken agent closes after the normal short follow-up window.
             if (VoiceLiveService.instance == null) putExtra("proactive_type", "native_announcement")
             putExtra("proactive_message", prompt(text))
         }
         return try {
             val service = VoiceLiveService.instance
-            if (service != null) service.onStartCommand(intent, 0, 0)
-            else context.startForegroundService(intent)
+            if (service != null) {
+                service.onStartCommand(intent, 0, 0)
+            } else {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }
             handler.postAtTime({
                 if (pending?.id == request.id) {
                     VoiceLiveService.instance?.cancelAgentSpeech(request.id)
@@ -61,9 +72,20 @@ object AgentSpeech {
             val open = android.app.PendingIntent.getActivity(context, 0,
                 Intent(context, com.example.voicebrainlive.AssistantActivity::class.java),
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+            val settings = android.app.PendingIntent.getActivity(context, 94641,
+                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.parse("package:${context.packageName}")),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
             manager.notify(94640, androidx.core.app.NotificationCompat.Builder(context, channel)
                 .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Agent ကို ဖွင့်ရန် နှိပ်ပါ")
-                .setContentText("Android က နောက်ခံမှ စတင်ခွင့်မပေးပါ။")
+                .setContentText("နောက်ခံမှ စတင်မရပါ။ App ဖွင့်ပြီး ပြန်စစ်ပါ။")
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(
+                    "နောက်ခံမှ အသံ သို့မဟုတ် အလုပ် စတင်မရပါ။ App ဖွင့်ပြီး အလုပ်အခြေအနေကို ပြန်စစ်ပါ။ " +
+                    "App settings တွင် Battery နှင့် Notifications ကို စစ်နိုင်သည်။ " +
+                    "Microphone စတင်ခြင်းအတွက် App ကို ကိုယ်တိုင်ဖွင့်ရန် လိုနိုင်သည်။"))
+                .setVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PRIVATE)
+                .setOnlyAlertOnce(true)
+                .addAction(android.R.drawable.ic_menu_preferences, "App settings", settings)
                 .setContentIntent(open).setAutoCancel(true).build())
         } catch (_: RuntimeException) { /* A revoked notification permission must not crash the app. */ }
     }

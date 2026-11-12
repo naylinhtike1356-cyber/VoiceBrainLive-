@@ -39,10 +39,14 @@ android {
         applicationId = "com.example.voicebrainlive"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.6.0"
+        versionCode = 19
+        versionName = "1.6.6"
         buildConfigField("boolean", "PRIVATE_TEST_BUILD", "false")
-        buildConfigField("String", "UPDATE_REPOSITORY", "\"naylinhtike1356-cyber/VoiceBrainLive-\"")
+        // Dedicated VoiceBrainLive release origin. Never fall back to Smart Salary.
+        val updateBaseUrl = getLocalProperty("UPDATE_BASE_URL", "https://voicebrainlive.vercel.app")
+        buildConfigField("String", "UPDATE_REPOSITORY", "\"\"")
+        buildConfigField("String", "UPDATE_BASE_URL", updateBaseUrl.asBuildConfigString())
+        buildConfigField("String", "APP_NAME_CONFIG", "\"VoiceBrainLive\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -71,7 +75,7 @@ android {
             matchingFallbacks += listOf("debug")
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
-            listOf("GEMINI_API_KEY", "YOUTUBE_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "SPOTIFY_CLIENT_ID", "UPDATE_REPOSITORY")
+            listOf("GEMINI_API_KEY", "YOUTUBE_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "SPOTIFY_CLIENT_ID", "UPDATE_REPOSITORY", "UPDATE_BASE_URL")
                 .forEach { buildConfigField("String", it, "\"\"") }
             buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"voicebrainlive-beta://callback\"")
         }
@@ -83,7 +87,7 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
             buildConfigField("boolean", "PRIVATE_TEST_BUILD", "true")
-            listOf("GEMINI_API_KEY", "YOUTUBE_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "SPOTIFY_CLIENT_ID", "UPDATE_REPOSITORY")
+            listOf("GEMINI_API_KEY", "YOUTUBE_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "SPOTIFY_CLIENT_ID", "UPDATE_REPOSITORY", "UPDATE_BASE_URL")
                 .forEach { buildConfigField("String", it, "\"\"") }
             buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"voicebrainlive-private-test://callback\"")
         }
@@ -128,6 +132,7 @@ android {
             isShrinkResources = false
             matchingFallbacks += listOf("release")
             buildConfigField("String", "UPDATE_REPOSITORY", "\"\"")
+            buildConfigField("String", "UPDATE_BASE_URL", "\"\"")
         }
     }
     compileOptions {
@@ -242,7 +247,7 @@ dependencies {
     if (!agentUpdateCandidate) debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
     
     // Phase 3: CameraX for Vision
-    val camerax_version = "1.3.4"
+    val camerax_version = "1.4.2"
     implementation("androidx.camera:camera-core:${camerax_version}")
     implementation("androidx.camera:camera-camera2:${camerax_version}")
     implementation("androidx.camera:camera-lifecycle:${camerax_version}")

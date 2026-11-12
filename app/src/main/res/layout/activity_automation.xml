@@ -1,50 +1,473 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:background="@drawable/bg_gradient">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_gradient">
+
     <!-- Header -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical" android:padding="12dp">
-        <ImageButton android:id="@+id/btnBack" android:layout_width="48dp" android:layout_height="48dp"
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_revert" app:tint="?attr/colorOnSurface"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="?attr/colorOnSurface"
             android:contentDescription="@string/desc_back" />
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-            android:layout_marginStart="8dp" android:text="@string/hub_title"
-            android:textColor="?attr/colorOnSurface" android:textSize="22sp" android:fontFamily="sans-serif-medium" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/hub_title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="20sp"
+            android:fontFamily="sans-serif-medium" />
     </LinearLayout>
-    <com.google.android.material.tabs.TabLayout android:id="@+id/hubTabs"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:background="?attr/colorSurface" app:tabMode="scrollable" app:tabGravity="start"
-        app:tabMinWidth="140dp" app:tabIndicatorFullWidth="false"
-        app:tabTextColor="?attr/colorOnSurface" app:tabSelectedTextColor="?attr/colorPrimary"
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/hubTabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        app:tabMode="fixed"
+        app:tabGravity="fill"
+        app:tabIndicatorFullWidth="false"
+        app:tabTextColor="?attr/colorOnSurface"
+        app:tabSelectedTextColor="?attr/colorPrimary"
         app:tabIndicatorColor="?attr/colorPrimary">
-        <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/hub_scheduled_tab" />
-        <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/hub_routines_tab" />
-        <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/hub_macros_tab" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/hub_modes_tab" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/hub_routines_tab" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/hub_agent_tasks_tab" />
     </com.google.android.material.tabs.TabLayout>
-    <TextView android:id="@+id/tvTabHeading" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:padding="16dp" android:text="@string/hub_scheduled_heading" android:textSize="15sp"
-        android:textColor="?attr/colorOnSurface" android:accessibilityLiveRegion="polite" />
-    <FrameLayout android:id="@+id/hubContent" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-        <ScrollView android:id="@+id/scheduledPanel" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
-            <LinearLayout android:id="@+id/scheduledBody" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="vertical" android:padding="16dp" />
+
+    <TextView
+        android:id="@+id/tvTabHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:text="@string/hub_modes_heading"
+        android:textSize="15sp"
+        android:textColor="?attr/colorOnSurface"
+        android:accessibilityLiveRegion="polite" />
+
+    <TextView
+        android:id="@+id/tvTabExplanation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="10dp"
+        android:text="@string/hub_modes_explanation"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="13sp"
+        android:lineSpacingExtra="3dp" />
+
+    <FrameLayout
+        android:id="@+id/hubContent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- Tab 0: Modes Panel (Samsung One UI Quick Modes) -->
+        <ScrollView
+            android:id="@+id/modesPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Bedtime Mode Card -->
+                <LinearLayout
+                    android:id="@+id/cardModeBedtime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card"
+                    android:backgroundTint="?attr/colorSurface"
+                    android:padding="16dp"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:text="🌙"
+                            android:textSize="22sp"
+                            android:gravity="center"
+                            android:layout_marginEnd="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="အိပ်စက်ချိန် မုဒ် (Bedtime Mode)"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="ဖုန်းအသံတိတ် • ညအိပ်တီးလုံးဖွင့် • ၃၀ မိနစ်ကြာလျှင် သီချင်းပိတ်"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="12sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="end"
+                        android:layout_marginTop="12dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnConfigBedtime"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="8dp"
+                            android:text="အချိန်သတ်မှတ်ရန်"
+                            android:textSize="12sp"
+                            android:textAllCaps="false"
+                            app:cornerRadius="16dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStartBedtime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:text="အခုစတင်မည်"
+                            android:textSize="12sp"
+                            android:textAllCaps="false"
+                            app:cornerRadius="16dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Work Mode Card -->
+                <LinearLayout
+                    android:id="@+id/cardModeWork"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card"
+                    android:backgroundTint="?attr/colorSurface"
+                    android:padding="16dp"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:text="💼"
+                            android:textSize="22sp"
+                            android:gravity="center"
+                            android:layout_marginEnd="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="အလုပ်ခွင် မုဒ် (Work Mode)"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="စိုင်းလန့်လုပ် • အသံ ၅၀% ထား • ပျော်ရွှင်စေမည့်သီချင်းဖွင့်"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="12sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="end"
+                        android:layout_marginTop="12dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnConfigWork"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="8dp"
+                            android:text="အချိန်သတ်မှတ်ရန်"
+                            android:textSize="12sp"
+                            android:textAllCaps="false"
+                            app:cornerRadius="16dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStartWork"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:text="အခုစတင်မည်"
+                            android:textSize="12sp"
+                            android:textAllCaps="false"
+                            app:cornerRadius="16dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Focus Mode Card -->
+                <LinearLayout
+                    android:id="@+id/cardModeFocus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card"
+                    android:backgroundTint="?attr/colorSurface"
+                    android:padding="16dp"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:text="🧘"
+                            android:textSize="22sp"
+                            android:gravity="center"
+                            android:layout_marginEnd="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="အာရုံစိုက် မုဒ် (Focus Mode)"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="နှောင့်ယှက်မှုကင်းစင် • အာရုံစိုက်တီးလုံး • အသံတိတ်"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="12sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="end"
+                        android:layout_marginTop="12dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStartFocus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:text="အခုစတင်မည်"
+                            android:textSize="12sp"
+                            android:textAllCaps="false"
+                            app:cornerRadius="16dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Morning Mode Card -->
+                <LinearLayout
+                    android:id="@+id/cardModeMorning"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_card"
+                    android:backgroundTint="?attr/colorSurface"
+                    android:padding="16dp"
+                    android:layout_marginBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:text="🌅"
+                            android:textSize="22sp"
+                            android:gravity="center"
+                            android:layout_marginEnd="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="မနက်ခင်း မုဒ် (Morning Briefing)"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="ပုံမှန်အသံပြောင်း • မနက်ခင်းရာသီဥတုနှင့် သတင်းအကျဉ်းချုပ်"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="12sp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="end"
+                        android:layout_marginTop="12dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStartMorning"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:text="အခုစတင်မည်"
+                            android:textSize="12sp"
+                            android:textAllCaps="false"
+                            app:cornerRadius="16dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+            </LinearLayout>
         </ScrollView>
-        <LinearLayout android:id="@+id/routinesPanel" android:layout_width="match_parent" android:layout_height="match_parent"
-            android:orientation="vertical" android:visibility="gone">
-            <com.google.android.material.button.MaterialButton android:id="@+id/btnAddAutomation"
-                android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
-                android:layout_marginHorizontal="16dp" android:text="@string/automation_add" android:textAllCaps="false" app:cornerRadius="20dp" />
-            <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-                <TextView android:id="@+id/tvEmpty" android:layout_width="match_parent" android:layout_height="match_parent"
-                    android:gravity="center" android:padding="32dp" android:text="@string/automation_empty"
-                    android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:lineSpacingExtra="4dp" android:visibility="gone" />
-                <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerAutomation" android:layout_width="match_parent"
-                    android:layout_height="match_parent" android:padding="16dp" android:clipToPadding="false" />
+
+        <!-- Tab 1: Routines & Macros Panel (Unified List) -->
+        <LinearLayout
+            android:id="@+id/routinesPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddAutomation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/hub_add_routine"
+                android:textAllCaps="false"
+                app:cornerRadius="20dp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/tvEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:padding="32dp"
+                    android:text="@string/automation_empty"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="4dp"
+                    android:visibility="gone" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerAutomation"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp"
+                    android:clipToPadding="false" />
             </FrameLayout>
         </LinearLayout>
-        <FrameLayout android:id="@+id/macrosPanel" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="gone" />
+
+        <!-- Tab 2: Agent Tasks & Scheduled Requests Panel -->
+        <ScrollView
+            android:id="@+id/scheduledPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/scheduledBody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp" />
+        </ScrollView>
+
+        <!-- Legacy Macro Panel holder (kept for view binding compatibility) -->
+        <FrameLayout
+            android:id="@+id/macrosPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
     </FrameLayout>
 </LinearLayout>
