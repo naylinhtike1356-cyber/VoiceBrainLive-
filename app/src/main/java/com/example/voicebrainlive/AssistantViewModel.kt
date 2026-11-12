@@ -80,10 +80,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (service != null) {
             service.sendTextInput(text)
         } else {
-            if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
+            val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(app, text)
+            if (routine != null || OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
                 val executor = phoneExecutor
                 viewModelScope.launch {
-                    val result = com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
+                    val result = routine?.let { com.example.voicebrainlive.usecases.AutomationCommandRunner(app).run(it) }
+                        ?: com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync)
@@ -114,7 +116,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val systemExtra = PersonalSystemInstructionBuilder.build(app, basePrefs)
 
         phoneExecutor = PhoneCommandExecutor(app)
-        geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra) { cmd, target, value ->
+        geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra, automationContext = app) { cmd, target, value ->
             val networkCmds = listOf(
                 "get_weather", "weather", "search_coupang", "search_aliexpress", "web_search", "search", "search_news",
                 "send_sms", "send_messenger", "send_facebook_message", "send_whatsapp"

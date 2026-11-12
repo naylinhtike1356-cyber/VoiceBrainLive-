@@ -5,6 +5,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CompoundCommandExecutorTest {
+    @Test
+    fun durationConnectorStaysInsideTheTimerStep() {
+        val steps = CompoundCommandExecutor.parseSteps("သီချင်းဖွင့်ပြီး ၃၀ မိနစ်ပြီးရင် ပိတ်ပေးပါ")
+        assertEquals(listOf("media_play", "set_music_sleep_timer"), steps?.map { it.first })
+        assertEquals("30", steps?.last()?.third)
+    }
 
     @Test
     fun parseStepsReturnsNullForSingleCommand() {

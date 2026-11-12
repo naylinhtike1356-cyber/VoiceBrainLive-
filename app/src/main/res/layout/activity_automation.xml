@@ -419,6 +419,25 @@
                 android:textAllCaps="false"
                 app:cornerRadius="20dp" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOpenMacros"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:text="သိမ်းထားသော မက်ခရိုများ"
+                android:textAllCaps="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnExactAlarmSettings"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:text="အချိန်အတိအကျအတွက် Alarms &amp; reminders ခွင့်ပြုရန်"
+                android:textAllCaps="false"
+                android:visibility="gone" />
+
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"

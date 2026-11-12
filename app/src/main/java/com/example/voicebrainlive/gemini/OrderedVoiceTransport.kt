@@ -35,7 +35,9 @@ internal class OrderedVoiceTransport(
     private val toolTimeoutMillis: Long = 30_000
 ) {
     data class Call @JvmOverloads constructor(val id: String, val name: String, val arguments: String,
-        val musicSleepRecipe: Triple<String,String?,String?>? = null)
+        val musicSleepRecipe: Triple<String,String?,String?>? = null,
+        val automationInput: String? = null,
+        val suppressAfterAutomation: Boolean = false)
     private data class Entry(val call: Call, var cancelled: Boolean = false, var complete: Boolean = false, var job: Job? = null)
     private val lock = Any()
     private val frames = Channel<String>(frameCapacity)

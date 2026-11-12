@@ -18,10 +18,15 @@ import com.example.voicebrainlive.usecases.AutomationCommandRunner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 /**
  * Foreground service: agent-style scheduled automation.
@@ -32,7 +37,8 @@ class RoutineSpeakerService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val commandRunner by lazy { AutomationCommandRunner(this) }
-    private var serviceWakeLock: PowerManager.WakeLock? = null
+    private val execution = Mutex()
+    private var pendingRuns = 0
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) return START_NOT_STICKY
@@ -50,9 +56,10 @@ class RoutineSpeakerService : Service() {
         val sleepTimerMinutes = intent.getIntExtra("extra_automation_sleep_timer_minutes", 0)
         val actionsSequence = intent.getStringExtra("extra_automation_actions_sequence") ?: ""
 
-        if (!AutomationExecutionLedger.tryClaim(this, id, type, isPre)) {
+        val scheduled = intent.getLongExtra(RoutineReceiver.EXTRA_OCCURRENCE, 0L) > 0
+        if (!scheduled && !AutomationExecutionLedger.tryClaim(this, id, type, isPre)) {
             Log.i(TAG, "Skipping duplicate routine trigger id=$id type=$type isPre=$isPre")
-            stopSelf(startId)
+            if (pendingRuns == 0) stopSelf(startId)
             return START_NOT_STICKY
         }
 
@@ -68,21 +75,6 @@ class RoutineSpeakerService : Service() {
         Log.d(TAG, "Triggered id=$id type=$type isPre=$isPre shouldSpeak=$shouldSpeak routineName=$routineName")
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        serviceWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VoiceBrain:RoutineSpeakerServiceWakeLock").apply {
-            acquire(300_000L) // 5 minutes max
-        }
-
-        try {
-            @Suppress("DEPRECATION")
-            val screenLock = powerManager.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "VoiceBrain:RoutineSpeakerScreenWakeLock"
-            )
-            screenLock.acquire(10000L) // Wake up screen for 10 seconds to allow playback to start
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to acquire screen wake lock: ${e.message}")
-        }
-
         val tapIntent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
@@ -114,46 +106,60 @@ class RoutineSpeakerService : Service() {
             .setAutoCancel(true)
             .build()
 
-        startForeground(id.coerceIn(100, 99999), notification)
+        startForeground(ROUTINE_NOTIFICATION_ID, notification)
 
+        pendingRuns++
         scope.launch {
             try {
-                if (shouldSpeak && announce.isNotBlank()) {
-                    speakAndAwait(announce, isCalm = true)
+                execution.withLock {
+                    val wakeLock = powerManager.newWakeLock(
+                        PowerManager.PARTIAL_WAKE_LOCK, "VoiceBrain:RoutineSpeakerServiceWakeLock"
+                    ).apply { acquire(300_000L) }
+                    try {
+                        if (shouldSpeak && announce.isNotBlank()) speakAndAwait(announce, isCalm = true)
+                        if (!isPre) {
+                            val result = withContext(Dispatchers.IO) {
+                                commandRunner.run(RoutineStorage.RoutineItem(
+                                    id = if (scheduled) id else -1, hour = 0, minute = 0,
+                                    type = type, message = message, musicQuery = musicQuery,
+                                    ringerMode = ringerMode, volumePercent = volumePercent,
+                                    sleepTimerMinutes = sleepTimerMinutes, actionsSequence = actionsSequence
+                                ))
+                            }
+                            if (scheduled && AutomationExecutionLedger.classify(result) in setOf(
+                                    AutomationExecutionLedger.Result.BLOCKED,
+                                    AutomationExecutionLedger.Result.FAILED,
+                                    AutomationExecutionLedger.Result.PARTIAL
+                                )) {
+                                com.example.voicebrainlive.voice.AgentSpeech.showOpenNotification(this@RoutineSpeakerService)
+                            }
+                            if (shouldSpeak && shouldSpeakResult(type, result, announce)) {
+                                speakAndAwait(result, isCalm = true)
+                            }
+                        }
+                    } finally {
+                        if (wakeLock.isHeld) wakeLock.release()
+                    }
                 }
-
-                if (!isPre) {
-                    val result = withContext(Dispatchers.IO) {
-                        commandRunner.run(
-                            type = type,
-                            message = message,
-                            musicQuery = musicQuery,
-                            isPreReminder = false,
-                            ringerMode = ringerMode,
-                            volumePercent = volumePercent,
-                            sleepTimerMinutes = sleepTimerMinutes,
-                            actionsSequence = actionsSequence
-                        )
-                    }
-                    if (shouldSpeak && shouldSpeakResult(type, result, announce)) {
-                        speakAndAwait(result, isCalm = true)
-                    }
-
-                    RoutineStorage.getById(this@RoutineSpeakerService, id)?.let { item ->
-                        RoutineScheduler.schedule(this@RoutineSpeakerService, item)
-                    }
-                }
+            } catch (cancelled: CancellationException) {
+                if (scheduled && !isPre) AutomationExecutionLedger.record(
+                    this@RoutineSpeakerService, id, AutomationExecutionLedger.Result.INTERRUPTED
+                )
+                throw cancelled
             } catch (e: Exception) {
                 Log.e(TAG, "Execution error", e)
+                if (scheduled && !isPre) AutomationExecutionLedger.record(
+                    this@RoutineSpeakerService, id, AutomationExecutionLedger.Result.FAILED
+                )
                 if (shouldSpeak) {
                     speakAndAwait("အလိုအလျောက် လုပ်ဆောင်ချက် မအောင်မြင်ပါ။", isCalm = true)
                 }
             } finally {
-                if (serviceWakeLock?.isHeld == true) {
-                    try { serviceWakeLock?.release() } catch (_: Exception) {}
+                pendingRuns--
+                if (pendingRuns == 0) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
                 }
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
             }
         }
 
@@ -174,13 +180,23 @@ class RoutineSpeakerService : Service() {
 
     private suspend fun speakAndAwait(text: String, isCalm: Boolean = true) {
         if (text.isBlank()) return
-        suspendCoroutine { cont ->
-            val tts = TtsUnifiedInterface(this)
-            tts.speakLocalDirect(text, isCalm = isCalm) {
-                tts.shutdown()
-                cont.resume(Unit)
+        val tts = TtsUnifiedInterface(this)
+        try {
+            withTimeoutOrNull(12_000) {
+                suspendCancellableCoroutine { continuation ->
+                    tts.speakLocalDirect(text, isCalm = isCalm) {
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
+                }
             }
+        } finally {
+            tts.shutdown()
         }
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
     }
 
     private fun createChannel(channelId: String, importance: Int) {
@@ -194,6 +210,7 @@ class RoutineSpeakerService : Service() {
 
     companion object {
         private const val TAG = "RoutineSpeaker"
+        private const val ROUTINE_NOTIFICATION_ID = 94641
         private const val CHANNEL_ID_LOW = "voice_brain_routines_low"
         private const val CHANNEL_ID_HIGH = "voice_brain_routines_alarm"
     }

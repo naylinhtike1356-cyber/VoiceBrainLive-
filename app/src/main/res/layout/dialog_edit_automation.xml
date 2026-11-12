@@ -330,6 +330,20 @@
             android:inputType="textCapSentences|textMultiLine"
             android:layout_marginBottom="12dp" />
 
+        <EditText
+            android:id="@+id/etRoutineActions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minLines="2"
+            android:gravity="top|start"
+            android:hint="လုပ်ဆောင်ချက်များ — set_volume:50;media_play;set_music_sleep_timer:30"
+            android:background="@drawable/bg_edit_text"
+            android:textColorHint="@color/assistant_text_muted"
+            android:textColor="@color/assistant_text"
+            android:padding="14dp"
+            android:inputType="textNoSuggestions|textMultiLine"
+            android:layout_marginBottom="12dp" />
+
         <!-- Advance Reminder -->
         <TextView
             android:id="@+id/tvReminderBeforeLabel"

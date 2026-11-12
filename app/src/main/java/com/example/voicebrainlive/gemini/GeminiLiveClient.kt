@@ -29,6 +29,7 @@ class GeminiLiveClient(
     private var model: String = "models/gemini-3.1-flash-live-preview",
     private val voice: String = "Aoede",
     private val systemInstructionExtra: String = "",
+    private val automationContext: android.content.Context? = null,
     private val onExecutePhoneCommand: suspend (commandType: String, target: String?, value: String?) -> String = { _, _, _ -> "Not implemented" }
 ) {
     
@@ -409,7 +410,7 @@ class GeminiLiveClient(
                 put("properties", JSONObject().apply {
                     put("command_type", JSONObject().apply {
                         put("type", "string")
-                        put("description", "Command type")
+                        put("description", "For a saved routine or its spoken trigger use run_saved_routine once. For multiple immediate phone actions use run_compound_command once. Both use the user's actual speech transcript. Omit target and value and do not dispatch individual actions for the same request.")
                         put("enum", org.json.JSONArray().apply {
                             put("make_call")
                             put("call_contact")
@@ -448,6 +449,10 @@ class GeminiLiveClient(
                             put("set_reminder")
                             put("list_reminders")
                             put("add_scheduled_routine")
+                            if (automationContext != null) {
+                                put("run_saved_routine")
+                                put("run_compound_command")
+                            }
                             put("list_routines")
                             put("delete_scheduled_routine")
                             put("get_battery_status")
@@ -809,8 +814,14 @@ class GeminiLiveClient(
         }
         connectionEpoch.withCurrent(epoch) {
             val destination = webSocket ?: return@withCurrent
-            val sleepRecipe = sleepVoiceInput?.takeIf { it.first === epoch }?.second?.recipe()
-            transportFor(epoch, destination)?.offerTool(OrderedVoiceTransport.Call(id, name, args.toString(), sleepRecipe))
+            val input = sleepVoiceInput?.takeIf { it.first === epoch }?.second
+            val automation = name == "execute_phone_command" &&
+                args.optString("command_type") in setOf("run_saved_routine", "run_compound_command")
+            val automationInput = if (automation) input?.takeAutomationInput() else null
+            val allowTool = automation || input?.admitNormalTool() != false
+            transportFor(epoch, destination)?.offerTool(OrderedVoiceTransport.Call(
+                id, name, args.toString(), input?.recipe(), automationInput, !allowTool
+            ))
         }
     }
 
@@ -957,6 +968,24 @@ class GeminiLiveClient(
         if (!connectionEpoch.current(epoch)) throw kotlinx.coroutines.CancellationException("Voice session ended")
         val preparationStart = System.nanoTime()
         val args = JSONObject(call.arguments)
+        if (call.suppressAfterAutomation) return "BLOCKED: ဒီစကားအတွက် လုပ်ဆောင်ချက်အစီအစဉ် တစ်ခု လက်ခံထားပြီးပါပြီ။"
+        if (call.name == "execute_phone_command") {
+            val command = args.optString("command_type")
+            if (command == "run_saved_routine" || command == "run_compound_command") {
+                val input = call.automationInput
+                    ?: return "BLOCKED: အမိန့်အစုံကို အပြည့်အစုံ ပြန်ပြောပေးပါ။"
+                val context = automationContext
+                    ?: return "BLOCKED: ဒီ session မှာ Routine ကို အသုံးမပြုနိုင်ပါ။"
+                if (command == "run_saved_routine") {
+                    val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(context, input)
+                        ?: return "BLOCKED: ဖွင့်ထားတဲ့ Routine အမည် သို့မဟုတ် သိမ်းထားတဲ့ စကားစုကို ပြန်ပြောပေးပါ။"
+                    return com.example.voicebrainlive.usecases.AutomationCommandRunner(context).run(routine)
+                }
+                return com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(
+                    input, { connectionEpoch.current(epoch) }, onExecutePhoneCommand
+                ) ?: "BLOCKED: လုပ်မယ့်အဆင့်တွေကို ခွဲပြီး ပြန်ပြောပေးပါ။"
+            }
+        }
         if (call.name == "propose_agent_plan") {
             if (args.keys().asSequence().toSet() != setOf("proposal") || args.opt("proposal") !is String)
                 return "AGENT_ERROR:MODEL_FIELDS"

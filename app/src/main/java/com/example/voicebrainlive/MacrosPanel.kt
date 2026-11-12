@@ -9,6 +9,9 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.example.voicebrainlive.MacrosActivity.MacroItem
 import com.example.voicebrainlive.MacrosActivity.MacrosAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -17,7 +20,7 @@ import com.example.voicebrainlive.commands.MacroDefinitions
 import com.example.voicebrainlive.databinding.ActivityMacrosBinding
 
 /** Same macro preferences and validation for the hub and legacy entry point. */
-internal class MacrosPanel(context: Context, private val binding: ActivityMacrosBinding) : android.content.ContextWrapper(context) {
+internal class MacrosPanel(private val host: Context, private val binding: ActivityMacrosBinding) : android.content.ContextWrapper(host) {
     private var dialog: AlertDialog? = null
     fun pause() { dialog?.dismiss(); dialog = null }
     private lateinit var prefs: SharedPreferences
@@ -136,6 +139,21 @@ internal class MacrosPanel(context: Context, private val binding: ActivityMacros
             .setView(android.widget.ScrollView(this).apply { addView(container) })
             .setPositiveButton("သိမ်းမည်", null)
             .setNegativeButton("မသိမ်းပါ") { dialog, _ -> dialog.dismiss() }
+            .apply {
+                if (item != null && host is LifecycleOwner) {
+                    setNeutralButton("သိမ်းထားသည်ကို စမ်းမည်") { _, _ ->
+                        host.lifecycleScope.launch {
+                            val result = com.example.voicebrainlive.commands.PhoneCommandExecutor(host)
+                                .executeAsync("run_macro", item.name)
+                            dialog = AlertDialog.Builder(this@MacrosPanel)
+                                .setTitle(item.name)
+                                .setMessage(com.example.voicebrainlive.commands.CommandResultFormatter.format(result))
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show()
+                        }
+                    }
+                }
+            }
             .create().also { dialog ->
                 dialog.show()
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {

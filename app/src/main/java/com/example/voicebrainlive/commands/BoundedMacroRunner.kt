@@ -74,7 +74,8 @@ class BoundedMacroRunner(
     private val monotonicMillis: () -> Long,
     private val durationMillis: Long = 30_000,
     private val perLeafMillis: Long = 5_000,
-    private val fallbackValueToTarget: Boolean = true
+    private val fallbackValueToTarget: Boolean = true,
+    private val allowNumericShorthand: Boolean = false
 ) {
     private data class FrozenProgram(val definitions: Map<String, String>, val leaves: List<MacroLeaf>)
     private class Rejected(val reason: String) : IllegalArgumentException(reason)
@@ -174,13 +175,26 @@ class BoundedMacroRunner(
             val step = if (risk == MacroLeafRisk.SENSITIVE || separator < 0) remaining
                 else remaining.substring(0, separator)
             val parts = step.trimStart().split(':', limit = 3)
+            val explicitNumber = command in NUMBER_VALUE_COMMANDS && parts.getOrNull(1).isNullOrEmpty() &&
+                parts.getOrNull(2)?.matches(NUMERIC_VALUE) == true
             if (risk == MacroLeafRisk.SAFE && separator >= 0 &&
-                (command in FREE_TEXT_COMMANDS || parts.size == 3)) throw Rejected("AMBIGUOUS_PAYLOAD_SEPARATOR")
+                (command in FREE_TEXT_COMMANDS || (parts.size == 3 && !explicitNumber))) {
+                throw Rejected("AMBIGUOUS_PAYLOAD_SEPARATOR")
+            }
             val target = parts.getOrNull(1)
-            val value = parts.getOrNull(2) ?: target.takeIf { useTargetFallback }
+            val shorthandNumber = allowNumericShorthand && !useTargetFallback && command in NUMBER_VALUE_COMMANDS &&
+                parts.size == 2 && target?.matches(NUMERIC_VALUE) == true
+            val value = (parts.getOrNull(2) ?: target.takeIf { useTargetFallback || shorthandNumber })
+                ?.let { raw ->
+                    if (command == "set_music_sleep_timer") {
+                        raw.map { if (it in '၀'..'၉') '0' + (it - '၀') else it }.joinToString("")
+                    } else raw
+                }
             if ((target?.length ?: 0) > MAX_ARGUMENT_CHARS || (value?.length ?: 0) > MAX_ARGUMENT_CHARS)
                 throw Rejected("ARGUMENT_LENGTH_LIMIT")
-            steps += MacroLeaf(command, target, value, risk)
+            val commandTarget = if (explicitNumber || shorthandNumber ||
+                (command == "set_music_sleep_timer" && parts.size == 2 && value?.toIntOrNull() != null)) null else target
+            steps += MacroLeaf(command, commandTarget, value, risk)
             if (steps.size > MAX_LEAVES) throw Rejected("MACRO_STEP_LIMIT")
             if (risk == MacroLeafRisk.SENSITIVE || separator < 0) break
             remaining = remaining.substring(separator + 1).trimStart(';')
@@ -194,6 +208,8 @@ class BoundedMacroRunner(
         const val MAX_SEQUENCE_CHARS = 1_000
         const val MAX_ARGUMENT_CHARS = 200
         const val MAX_NAME_CHARS = 160
+        private val NUMBER_VALUE_COMMANDS = setOf("set_volume", "set_music_sleep_timer")
+        private val NUMERIC_VALUE = Regex("[0-9၀-၉]{1,3}%?")
         private val FREE_TEXT_COMMANDS = setOf("save_note", "add_note", "remember", "remember_fact", "add_memory",
             "save_preference", "record_correction", "save_correction", "create_macro", "set_reminder", "add_routine",
             "add_scheduled_routine", "add_meeting_note", "take_note")

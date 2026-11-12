@@ -128,6 +128,9 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
     suspend fun executeLocalTextCommand(text: String): String = withContext(Dispatchers.IO) {
         UserUtteranceContext.set(text)
         val executor = ensurePhoneExecutor()
+        com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(app, text)?.let {
+            return@withContext formatLocalCommandResult(com.example.voicebrainlive.usecases.AutomationCommandRunner(app).run(it))
+        }
         com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
             { phoneExecutor === executor },executor::executeAsync)?.let{return@withContext formatLocalCommandResult(it)}
         com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
@@ -161,7 +164,9 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
             // Explicit local controls precede learning, connectivity checks and every model/planner.
             val executor = ensurePhoneExecutor()
             val reviewedCall=com.example.voicebrainlive.commands.ReviewedCallInput.target(trimmed)!=null
-            val direct = com.example.voicebrainlive.commands.ReviewedCallInput.execute(trimmed,
+            val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(app, trimmed)
+            val direct = routine?.let { com.example.voicebrainlive.usecases.AutomationCommandRunner(app).run(it) }
+                ?: com.example.voicebrainlive.commands.ReviewedCallInput.execute(trimmed,
                 { phoneExecutor === executor },executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(trimmed,
                 { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(trimmed,
                 { phoneExecutor === executor }, executor::executeAsync)
@@ -326,7 +331,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         _statusMessage.value = "Initializing memory..."
 
 
-        geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra) { cmd, target, value ->
+        geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra, automationContext = app) { cmd, target, value ->
             _uiState.update { AssistantState.Processing }
             val result = phoneExecutor.executeAsync(cmd, target, value)
             

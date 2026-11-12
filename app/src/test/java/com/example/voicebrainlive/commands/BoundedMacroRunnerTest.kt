@@ -11,6 +11,16 @@ import org.junit.Test
 
 /** Fake-only macro regression tests. Fake definitions/clock/guard outcomes only; no Android effects. */
 class BoundedMacroRunnerTest {
+    @Test fun numericValueWithoutTargetCanPrecedeAnotherStep() = runBlocking {
+        definitions["root"] = "set_volume::75;get_date"
+        val captured = mutableListOf<MacroLeaf>()
+        val result = runner { leaf ->
+            captured += leaf
+            MacroLeafResult(MacroOutcomeStatus.VERIFIED)
+        }.run("root")
+        assertEquals(MacroOutcomeStatus.COMPLETED, result.status)
+        assertEquals(MacroLeaf("set_volume", null, "75", MacroLeafRisk.SAFE), captured.first())
+    }
     @Test fun automationRootKeepsNullSecondValueAndNestedMacroKeepsLegacyTargetFallback() = runBlocking {
         val calls = mutableListOf<MacroLeaf>()
         val definitions = mapOf("root" to "set_volume:30;run_macro:child", "child" to "set_volume:40")

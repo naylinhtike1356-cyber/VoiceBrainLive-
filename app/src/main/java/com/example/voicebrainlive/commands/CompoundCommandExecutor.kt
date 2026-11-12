@@ -71,7 +71,14 @@ object CompoundCommandExecutor {
 
         if (!conjunctionRegex.containsMatchIn(s)) return null
 
-        val rawParts = s.split(conjunctionRegex)
+        // A connector within a duration belongs to the timer step, not to the next command.
+        val protected = StringBuilder(s)
+        for (match in timedStopRegex.findAll(myanmarToArabic(s)).toList().asReversed()) {
+            val original = s.substring(match.range)
+            protected.replace(match.range.first, match.range.last + 1,
+                original.replace(Regex("ပြီးရင်|ပီးရင်"), "ကြာရင်"))
+        }
+        val rawParts = protected.split(conjunctionRegex)
             .map { it.trim().trimEnd('။', '.', '!').trim() }
             .filter { it.isNotBlank() }
 
@@ -87,7 +94,7 @@ object CompoundCommandExecutor {
 
             // Check if this part is a delayed sleep-timer or delayed pause (e.g. "၅ မိနစ်ကြာရင် ပိတ်ပေးပါ")
             val partNormalized = myanmarToArabic(part).replace(directSuffix, "").trim()
-            val timedStop = timedStopRegex.find(partNormalized)
+            val timedStop = timedStopRegex.matchEntire(partNormalized)
             if (timedStop != null) {
                 val num = (timedStop.groupValues[1].ifBlank { timedStop.groupValues[2] }).toIntOrNull()
                 if (num != null && num in 1..180) {
@@ -145,15 +152,20 @@ object CompoundCommandExecutor {
             if (!current()) return "BLOCKED:STALE_DIRECT_INPUT"
             try {
                 val rawResult = dispatch(step.first, step.second, step.third)
-                val formatted = CommandResultFormatter.format(rawResult)
-                results.add(formatted)
+                results.add("${results.size + 1}. ${CommandResultFormatter.format(rawResult)}")
+                if (step.first == "make_call" || rawResult.isBlank() ||
+                    listOf("BLOCKED:", "FAILED", "NEEDS_APPROVAL:", "UNVERIFIED:").any(rawResult::startsWith)) {
+                    break
+                }
             } catch (c: CancellationException) {
                 throw c
             } catch (_: Exception) {
-                results.add("ဆောင်ရွက်ရန် မအောင်မြင်ပါ")
+                results.add("${results.size + 1}. ဆောင်ရွက်ရန် မအောင်မြင်ပါ")
+                break
             }
         }
 
+        if (results.size < steps.size) results.add("ကျန်အဆင့် ${steps.size - results.size} ခုကို မလုပ်ဆောင်ရသေးပါ။")
         return results.joinToString("\n")
     }
 }

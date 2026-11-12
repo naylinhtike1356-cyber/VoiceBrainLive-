@@ -25,9 +25,9 @@ class SleepWakeVoiceTest {
         override fun close(code:Int,reason:String?)=true
         override fun cancel(){}
     }
-    private class F {
+    private class F(automationContext: android.content.Context? = null) {
         val calls=mutableListOf<Triple<String,String?,String?>>()
-        val client=GeminiLiveClient("fixture-no-network",CoroutineScope(Dispatchers.Unconfined+SupervisorJob()),onExecutePhoneCommand={c,t,v->calls+=Triple(c,t,v);"request dispatched"})
+        val client=GeminiLiveClient("fixture-no-network",CoroutineScope(Dispatchers.Unconfined+SupervisorJob()),automationContext=automationContext,onExecutePhoneCommand={c,t,v->calls+=Triple(c,t,v);"request dispatched"})
         fun field(name:String)=client.javaClass.getDeclaredField(name).apply{isAccessible=true}
         val epochs=field("connectionEpoch").get(client) as ConnectionEpoch
         val epoch=epochs.open(null);val socket=Socket()
@@ -59,4 +59,18 @@ class SleepWakeVoiceTest {
         f.user("၅ မိနစ်ကြာရင်သီချင်းပိတ်ပေး");f.tool("changed","set_music_sleep_timer","90");assertTrue(f.calls.isEmpty())
         f.tool("exact","set_music_sleep_timer");assertEquals("5",f.calls.single().third)
     }finally{f.client.disconnect()}}
+
+    @Test fun compoundVoiceUsesTranscriptOnceAndRejectsASecondDispatchForTheTurn() {
+        val f = F(org.robolectric.RuntimeEnvironment.getApplication())
+        try {
+            f.user("ဓာတ်မီးဖွင့်ပြီး အသံတိုးပေးပါ")
+            f.tool("compound", "run_compound_command", "untrusted model value")
+            f.tool("separate", "volume_up")
+            f.tool("repeat", "run_compound_command")
+            assertEquals(listOf("turn_on_flashlight", "volume_up"), f.calls.map { it.first })
+            assertTrue(f.socket.sent.last().contains("BLOCKED"))
+        } finally {
+            f.client.disconnect()
+        }
+    }
 }

@@ -430,7 +430,7 @@ class VoiceLiveService : Service() {
             )
         }
 
-        geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra) { cmd, target, value ->
+        geminiClient = GeminiLiveClient(apiKey, model = geminiModel, voice = voice, systemInstructionExtra = systemExtra, automationContext = applicationContext) { cmd, target, value ->
             if (agentSpeechTicket != null) return@GeminiLiveClient "Announcement only: tool execution is disabled."
             Log.d(TAG, "Command received: $cmd, target=$target, value=$value")
             val replyCmds = setOf(
@@ -1066,11 +1066,13 @@ class VoiceLiveService : Service() {
 
     fun sendTextInput(text: String) {
         currentUserInput = if (com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) "ခေါ်ဆိုရန် အတည်ပြုချက်" else "⌨️ $text"
-        if (OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
+        val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(this, text)
+        if (routine != null || OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
             // This method receives direct user text, never model/proactive tool-result text.
             val executor = phoneExecutor ?: PhoneCommandExecutor(this).also { phoneExecutor = it }
             serviceScope.launch {
-                val result = com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
+                val result = routine?.let { com.example.voicebrainlive.usecases.AutomationCommandRunner(this@VoiceLiveService).run(it) }
+                    ?: com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync)

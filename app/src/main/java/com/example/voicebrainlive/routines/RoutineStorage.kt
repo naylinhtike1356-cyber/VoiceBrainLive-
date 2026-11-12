@@ -2,9 +2,12 @@ package com.example.voicebrainlive.routines
 
 import android.content.Context
 import android.util.Log
+import android.util.AtomicFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * Routines Engine: Scheduled daily tasks (weather at 7am, reminder at noon, etc.)
@@ -14,6 +17,13 @@ object RoutineStorage {
 
     private const val FILE_NAME = "scheduled_routines.json"
     private const val MAX_ROUTINES = 50
+
+    private fun nextId(context: Context, items: List<RoutineItem>): Int {
+        val prefs = context.getSharedPreferences("routine_identity", Context.MODE_PRIVATE)
+        val id = maxOf(items.maxOfOrNull { it.id } ?: 0, prefs.getInt("last_id", 0)) + 1
+        check(prefs.edit().putInt("last_id", id).commit()) { "Could not allocate routine identity" }
+        return id
+    }
 
     /** dayOfWeek: 0 = daily, 1-7 = Calendar.SUNDAY..SATURDAY */
     data class RoutineItem(
@@ -42,11 +52,11 @@ object RoutineStorage {
 
     private fun getFile(context: Context) = File(context.filesDir, FILE_NAME)
 
+    @Synchronized
     private fun load(context: Context): MutableList<RoutineItem> {
         return try {
-            val file = getFile(context)
-            if (!file.exists()) return mutableListOf()
-            val json = file.readText()
+            val json = try { AtomicFile(getFile(context)).readFully().toString(Charsets.UTF_8) }
+            catch (_: java.io.FileNotFoundException) { return mutableListOf() }
             if (json.isBlank()) return mutableListOf()
             val arr = JSONArray(json)
             (0 until arr.length()).mapNotNull { i ->
@@ -110,24 +120,34 @@ object RoutineStorage {
                     put("repeatDays", daysArr)
                 })
             }
-            getFile(context).writeText(arr.toString())
+            val file = AtomicFile(getFile(context))
+            val output = file.startWrite()
+            try {
+                output.write(arr.toString().toByteArray(Charsets.UTF_8))
+                file.finishWrite(output)
+            } catch (failure: Exception) {
+                file.failWrite(output)
+                throw failure
+            }
         } catch (e: Exception) {
             Log.e("RoutineStorage", "save", e)
         }
     }
 
+    @Synchronized
     fun saveRoutine(context: Context, item: RoutineItem) {
         val items = load(context)
         val idx = items.indexOfFirst { it.id == item.id }
         if (idx >= 0) {
             items[idx] = item
         } else {
-            val newId = if (item.id > 0) item.id else (items.maxOfOrNull { it.id } ?: 0) + 1
+            val newId = if (item.id > 0) item.id else nextId(context, items)
             items.add(item.copy(id = newId))
         }
         save(context, items)
     }
 
+    @Synchronized
     fun add(
         context: Context,
         type: String,
@@ -149,7 +169,7 @@ object RoutineStorage {
         actionsSequence: String = ""
     ): RoutineItem {
         val items = load(context)
-        val id = (items.maxOfOrNull { it.id } ?: 0) + 1
+        val id = nextId(context, items)
         val item = RoutineItem(
             id = id,
             type = type,
@@ -178,12 +198,33 @@ object RoutineStorage {
 
     fun getAll(context: Context): List<RoutineItem> = load(context)
 
+    fun findVoiceRoutine(context: Context, input: String): RoutineItem? {
+        val phrase = normalizeTrigger(input)
+        if (phrase.isBlank()) return null
+        val name = when {
+            phrase.startsWith("run routine ") -> phrase.removePrefix("run routine ")
+            phrase.startsWith("လုပ်ရိုးလုပ်စဉ် ") -> phrase.removePrefix("လုပ်ရိုးလုပ်စဉ် ")
+            else -> null
+        }
+        return getAll(context).singleOrNull { item ->
+            item.enabled && (normalizeTrigger(item.triggerPhrase) == phrase ||
+                (name != null && normalizeTrigger(item.name) == name))
+        }
+    }
+
+    internal fun normalizeTrigger(value: String): String =
+        Normalizer.normalize(value, Normalizer.Form.NFC).lowercase(Locale.ROOT)
+            .replace("\u200b", "").trim().trimEnd('။', '.', '!').trim()
+            .replace(Regex("\\s+"), " ")
+
+    @Synchronized
     fun delete(context: Context, id: Int) {
         val items = load(context).filter { it.id != id }
         save(context, items)
         Log.d("RoutineStorage", "delete: id=$id")
     }
 
+    @Synchronized
     fun update(
         context: Context,
         id: Int,
@@ -236,6 +277,7 @@ object RoutineStorage {
 
     fun getById(context: Context, id: Int): RoutineItem? = load(context).find { it.id == id }
 
+    @Synchronized
     fun setEnabled(context: Context, id: Int, enabled: Boolean) {
         val items = load(context)
         val idx = items.indexOfFirst { it.id == id }

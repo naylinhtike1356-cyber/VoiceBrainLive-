@@ -50,10 +50,16 @@ class AutomationHubUiTest {
         return a.findViewById(id)
     }
     private fun dialog() = ShadowAlertDialog.getLatestAlertDialog()
+    private fun openMacros(a: AutomationActivity) {
+        tab(a, 1)
+        a.findViewById<View>(R.id.btnOpenMacros).performClick()
+        idle()
+    }
 
     @Test fun hubStartsWithoutSchedulingOrSeedingMacrosAndRestoresSelectedTab() = runBlocking<Unit> {
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
+        tab(a, 2)
         until { tagged<android.widget.TextView>(root(a), "requests_status").text.isNotBlank() }
         assertTrue(app.enqueued.isEmpty())
         assertNull(app.bytes.value)
@@ -69,6 +75,7 @@ class AutomationHubUiTest {
         val r = app.scheduledRequests.queueAccepted(app.scheduledRequests.create(RequestKind.AI_GOAL, "existing task", "", "", app.now + 300_000))
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
+        tab(a, 2)
         until { root(a).findViewWithTag<View>("requests_pause_${r.id}") != null }
         tagged<View>(root(a), "requests_pause_${r.id}").performClick()
         until { root(a).findViewWithTag<View>("requests_resume_${r.id}") != null }
@@ -86,6 +93,7 @@ class AutomationHubUiTest {
         app.scheduledRequests.due(r.id, r.revision)
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
+        tab(a, 2)
         until { root(a).findViewWithTag<View>("requests_review_${r.id}") != null }
         tagged<View>(root(a), "requests_review_${r.id}").performClick()
         val preview = dialog()
@@ -100,6 +108,7 @@ class AutomationHubUiTest {
 
     @Test fun notionPresetInHubStillRequiresExplicitSharingAndFinalReview() {
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
+        tab(c.get(), 2)
         tagged<View>(root(c.get()), "requests_notion").performClick()
         idle()
         val form = dialog()
@@ -112,7 +121,7 @@ class AutomationHubUiTest {
     }
 
     @Test fun routineToggleAndEditPreserveIdentityAndExecutionMode() {
-        val r = RoutineStorage.add(app, "weather", 7, 30, useLiveAgent = false)
+        val r = RoutineStorage.add(app, "weather", 7, 30, useLiveAgent = false, actionsSequence = "set_volume::50;mute")
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
         tab(a, 1)
@@ -130,6 +139,7 @@ class AutomationHubUiTest {
         assertEquals(30, saved.minute)
         assertFalse(saved.useLiveAgent)
         assertFalse(saved.enabled)
+        assertEquals(r.actionsSequence, saved.actionsSequence)
         c.pause().stop().destroy()
     }
 
@@ -138,7 +148,7 @@ class AutomationHubUiTest {
         prefs.edit().putString("my phrase", "volume_up").putBoolean("show_macro_guide", false).commit()
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
-        tab(a, 2)
+        openMacros(a)
         assertEquals(1, rows(a, R.id.recyclerMacros).adapter!!.itemCount)
         tagged<View>(root(a), "hub_macro_add").performClick()
         val form = dialog()
@@ -171,7 +181,7 @@ class AutomationHubUiTest {
     @Test fun openingEmptyMacroTabNeverCreatesOrRestoresDefinitions() {
         val prefs=app.getSharedPreferences("custom_macros",0)
         val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
-        tab(c.get(),2)
+        openMacros(c.get())
         assertTrue(prefs.all.isEmpty())
         assertEquals(0,rows(c.get(),R.id.recyclerMacros).adapter!!.itemCount)
         c.pause().stop().destroy()
@@ -181,7 +191,7 @@ class AutomationHubUiTest {
         val prefs=app.getSharedPreferences("custom_macros",0)
         prefs.edit().putString("Meeting Mode","mute").commit()
         val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
-        tab(c.get(),2)
+        openMacros(c.get())
         tagged<View>(root(c.get()),"hub_macro_add").performClick()
         val form=dialog()
         tagged<EditText>(form.window!!.decorView,"macro_name").setText(" MEETING MODE ")
@@ -199,6 +209,7 @@ class AutomationHubUiTest {
         val scheduled=app.scheduledRequests.queueAccepted(app.scheduledRequests.create(RequestKind.AI_GOAL,"upcoming","","",app.now+60_000))
         val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a=c.get()
+        tab(a, 2)
         until { root(a).findViewWithTag<View>("requests_section_UPCOMING")!=null }
         app.now=scheduled.dueAt
         app.scheduledRequests.due(scheduled.id,scheduled.revision)
@@ -215,6 +226,7 @@ class AutomationHubUiTest {
         val ready=app.scheduledRequests.due(scheduled.id,scheduled.revision)!!
         app.scheduledRequests.finish(app.scheduledRequests.claimReviewed(ready){true},true)
         val c=Robolectric.buildActivity(AutomationActivity::class.java).setup()
+        tab(c.get(), 2)
         until { root(c.get()).findViewWithTag<View>("requests_draft_${scheduled.id}")!=null }
         tagged<View>(root(c.get()),"requests_draft_${scheduled.id}").performClick()
         assertEquals(scheduled.id,Shadows.shadowOf(c.get()).nextStartedActivity.getStringExtra("scheduled_draft_id"))
@@ -242,6 +254,7 @@ class AutomationHubUiTest {
         val c = Robolectric.buildActivity(AutomationActivity::class.java).setup()
         val a = c.get()
         val root = root(a)
+        tab(a, 2)
         until { root.findViewWithTag<View>("requests_section_UPCOMING")!=null }
         for (index in 0..2) {
             tab(a, index)

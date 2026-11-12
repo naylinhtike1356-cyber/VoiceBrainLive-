@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.tabs.TabLayout
+import com.example.voicebrainlive.routines.AutomationExecutionLedger
 import com.example.voicebrainlive.agent.background.ScheduledRequestsPanel
 import com.example.voicebrainlive.databinding.ActivityAutomationBinding
 import com.example.voicebrainlive.databinding.ActivityMacrosBinding
@@ -73,6 +74,13 @@ class AutomationActivity : AppCompatActivity() {
         // Setup background agent / notion task panel
         scheduled = ScheduledRequestsPanel(this)
         scheduled.attach(binding.scheduledBody)
+        binding.btnOpenMacros.setOnClickListener { openMacros() }
+        binding.btnExactAlarmSettings.setOnClickListener {
+            val settings = com.example.voicebrainlive.routines.ExactAlarmPermissionHelper.openExactAlarmSettings(this)
+            runCatching { startActivity(settings) }.onFailure {
+                Toast.makeText(this, "Alarms & reminders ကို Android Settings မှာ ဖွင့်ပေးပါ။", Toast.LENGTH_LONG).show()
+            }
+        }
 
         // Setup Quick Modes card actions
         setupQuickModes()
@@ -218,17 +226,14 @@ class AutomationActivity : AppCompatActivity() {
         lifecycleScope.launch {
             Toast.makeText(this@AutomationActivity, "⚡ '${item.name.ifBlank { item.type }}' လုပ်ဆောင်နေပါသည်...", Toast.LENGTH_SHORT).show()
             val runner = AutomationCommandRunner(this@AutomationActivity)
-            val res = runner.run(
-                type = item.type,
-                message = item.message,
-                musicQuery = item.musicQuery,
-                ringerMode = item.ringerMode,
-                volumePercent = item.volumePercent,
-                sleepTimerMinutes = item.sleepTimerMinutes,
-                actionsSequence = item.actionsSequence
-            )
-            val feedback = if (res.isNotBlank()) res else "အော်တိုမေးရှင်း အောင်မြင်စွာ လုပ်ဆောင်ပြီးပါပြီ"
-            Toast.makeText(this@AutomationActivity, feedback, Toast.LENGTH_LONG).show()
+            val res = runner.run(item)
+            val feedback = com.example.voicebrainlive.commands.CommandResultFormatter.format(res)
+                .ifBlank { "ထပ်ဆောင်းလုပ်ဆောင်ချက် မရှိပါ။" }
+            AlertDialog.Builder(this@AutomationActivity)
+                .setTitle(item.name.ifBlank { item.type })
+                .setMessage(feedback)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
         }
     }
 
@@ -236,6 +241,7 @@ class AutomationActivity : AppCompatActivity() {
         super.onResume()
         resumed = true
         refreshSelectedPanel()
+        if (binding.macrosPanel.visibility == View.VISIBLE) macros?.loadMacros()
     }
 
     override fun onPause() {
@@ -286,7 +292,27 @@ class AutomationActivity : AppCompatActivity() {
         }
     }
 
+    private fun openMacros() {
+        if (macros == null) {
+            val panelBinding = com.example.voicebrainlive.databinding.ActivityMacrosBinding.inflate(
+                layoutInflater, binding.macrosPanel, true
+            )
+            panelBinding.btnBack.setOnClickListener {
+                macros?.pause()
+                binding.macrosPanel.visibility = View.GONE
+                binding.routinesPanel.visibility = View.VISIBLE
+            }
+            panelBinding.btnAddMacro.tag = "hub_macro_add"
+            macros = MacrosPanel(this, panelBinding)
+        }
+        binding.routinesPanel.visibility = View.GONE
+        binding.macrosPanel.visibility = View.VISIBLE
+        macros?.loadMacros()
+    }
+
     private fun loadAgentTasks() {
+        val exactAllowed = com.example.voicebrainlive.routines.ExactAlarmPermissionHelper.canScheduleExactAlarms(this)
+        binding.btnExactAlarmSettings.visibility = if (exactAllowed) View.GONE else View.VISIBLE
         val routines = RoutineStorage.getAll(this).map { AgentItem.Routine(it) }
         val reminders = ReminderHelper.getReminders(this).map { AgentItem.Reminder(it) }
         
@@ -374,6 +400,7 @@ class AutomationActivity : AppCompatActivity() {
         val spinnerSleepTimer = view.findViewById<Spinner>(R.id.spinnerSleepTimer)
         val tvSleepTimerLabel = view.findViewById<TextView>(R.id.tvSleepTimerLabel)
         val etMessage = view.findViewById<EditText>(R.id.etMessage)
+        val etActions = view.findViewById<EditText>(R.id.etRoutineActions)
         val tvMessageLabel = view.findViewById<TextView>(R.id.tvMessageLabel)
         val etReminderMinutesBefore = view.findViewById<EditText>(R.id.etReminderMinutesBefore)
         val etReminderText = view.findViewById<EditText>(R.id.etReminderText)
@@ -394,7 +421,8 @@ class AutomationActivity : AppCompatActivity() {
         spinnerType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, typeList.map { it.first }).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
-        val currentTypeIdx = typeList.indexOfFirst { it.second == template.type }.coerceAtLeast(0)
+        val editorType = if (template.type == "command") "macro" else template.type
+        val currentTypeIdx = typeList.indexOfFirst { it.second == editorType }.coerceAtLeast(0)
         spinnerType.setSelection(currentTypeIdx)
 
         // Day of Week options
@@ -452,7 +480,9 @@ class AutomationActivity : AppCompatActivity() {
         etRoutineName.setText(template.name)
         etTriggerPhrase.setText(template.triggerPhrase)
         etMusicQuery.setText(template.musicQuery)
-        etMessage.setText(template.message)
+        val legacyMacro = editorType == "macro" && template.actionsSequence.isBlank()
+        etMessage.setText(if (legacyMacro) "" else template.message)
+        etActions.setText(if (legacyMacro) template.message else template.actionsSequence)
         etVolumePercent.setText(if (template.volumePercent in 0..100) template.volumePercent.toString() else "")
         etReminderMinutesBefore.setText(template.reminderMinutesBefore.takeIf { it > 0 }?.toString().orEmpty())
         etReminderText.setText(template.reminderText)
@@ -518,10 +548,13 @@ class AutomationActivity : AppCompatActivity() {
             override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
         })
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(if (isEdit) getString(R.string.desc_edit) else getString(R.string.automation_add))
             .setView(view)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val type = typeList[spinnerType.selectedItemPosition].second
                 val name = etRoutineName.text.toString().trim()
                 val triggerPhrase = etTriggerPhrase.text.toString().trim()
@@ -529,6 +562,15 @@ class AutomationActivity : AppCompatActivity() {
                 val minute = calendar.get(Calendar.MINUTE)
                 val musicQuery = etMusicQuery.text.toString().trim()
                 val message = etMessage.text.toString().trim()
+                val actions = etActions.text.toString().trim().replace(Regex("\\r?\\n"), ";")
+                if (actions.isNotBlank() || type == "macro") {
+                    val validation = com.example.voicebrainlive.commands.AutomationCommandValidator.validateSequence(actions)
+                    if (!validation.valid) {
+                        etActions.error = validation.message
+                        etActions.requestFocus()
+                        return@setOnClickListener
+                    }
+                }
                 val ringerMode = ringerList[spinnerRingerMode.selectedItemPosition].second
                 val volumePercent = etVolumePercent.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: -1
                 val sleepTimerMinutes = sleepTimerList[spinnerSleepTimer.selectedItemPosition].second
@@ -537,7 +579,10 @@ class AutomationActivity : AppCompatActivity() {
                 val enabled = switchEnabled.isChecked
                 val useLiveAgent = switchLiveAgent.isChecked
 
-                val (dayOfWeek, repeatDays) = when (spinnerDay.selectedItemPosition) {
+                val (dayOfWeek, repeatDays) = when {
+                    isEdit && spinnerDay.selectedItemPosition == daySelection && template.repeatDays.isNotEmpty() ->
+                        template.dayOfWeek to template.repeatDays
+                    else -> when (spinnerDay.selectedItemPosition) {
                     1 -> 8 to listOf(2, 3, 4, 5, 6)
                     2 -> 9 to listOf(1, 7)
                     3 -> 1 to listOf(1)
@@ -548,6 +593,7 @@ class AutomationActivity : AppCompatActivity() {
                     8 -> 6 to listOf(6)
                     9 -> 7 to listOf(7)
                     else -> 0 to listOf(1, 2, 3, 4, 5, 6, 7)
+                    }
                 }
 
                 if (isEdit && template.id > 0) {
@@ -569,7 +615,8 @@ class AutomationActivity : AppCompatActivity() {
                         ringerMode = ringerMode,
                         volumePercent = volumePercent,
                         sleepTimerMinutes = sleepTimerMinutes,
-                        repeatDays = repeatDays
+                        repeatDays = repeatDays,
+                        actionsSequence = actions
                     )
                     RoutineScheduler.cancel(this, template.id)
                     RoutineStorage.getById(this, template.id)?.let { RoutineScheduler.schedule(this, it) }
@@ -592,7 +639,8 @@ class AutomationActivity : AppCompatActivity() {
                         ringerMode = ringerMode,
                         volumePercent = volumePercent,
                         sleepTimerMinutes = sleepTimerMinutes,
-                        repeatDays = repeatDays
+                        repeatDays = repeatDays,
+                        actionsSequence = actions
                     )
                     if (!enabled) {
                         RoutineStorage.setEnabled(this, created.id, false)
@@ -601,9 +649,8 @@ class AutomationActivity : AppCompatActivity() {
                     Toast.makeText(this, getString(R.string.automation_created), Toast.LENGTH_SHORT).show()
                 }
                 loadAgentTasks()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+                dialog.dismiss()
+        }
     }
 
     class AgentTaskAdapter(
@@ -689,9 +736,29 @@ class AutomationActivity : AppCompatActivity() {
                     }
                     holder.tvTime.text = "$daysStr $timeStr"
                     if (r.enabled) {
-                        val next = RoutineScheduler.nextTriggerTime(r.hour, r.minute, r.repeatDays, r.dayOfWeek)
-                        holder.tvTime.append("\n" + ctx.getString(R.string.hub_next_run, java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(next))))
+                        val schedule = RoutineScheduler.currentSchedule(ctx, r.id)
+                        val timing = when (schedule?.timing) {
+                            RoutineScheduler.Timing.EXACT -> "အချိန်အတိအကျ"
+                            RoutineScheduler.Timing.APPROXIMATE -> "အချိန်ခန့်မှန်း"
+                            RoutineScheduler.Timing.UNSCHEDULED -> "Alarm မသတ်မှတ်နိုင်သေးပါ"
+                            null -> "Alarm အခြေအနေ စစ်ဆေးရန်လိုသည်"
+                        }
+                        holder.tvTime.append("\n$timing")
+                        if (schedule != null && schedule.timing != RoutineScheduler.Timing.UNSCHEDULED) {
+                            val formatted = java.text.DateFormat.getDateTimeInstance().format(java.util.Date(schedule.at))
+                            holder.tvTime.append("\n" + ctx.getString(R.string.hub_next_run, formatted))
+                        }
                     }
+                    val last = when (AutomationExecutionLedger.lastResult(ctx, r.id)) {
+                        AutomationExecutionLedger.Result.COMPLETED -> "လုပ်ဆောင်ပြီး"
+                        AutomationExecutionLedger.Result.PARTIAL -> "တစ်စိတ်တစ်ပိုင်းပြီး"
+                        AutomationExecutionLedger.Result.NEEDS_REVIEW -> "ပြန်စစ်ရန်လိုသည်"
+                        AutomationExecutionLedger.Result.BLOCKED -> "လုပ်ဆောင်ခွင့် ပိတ်ထားသည်"
+                        AutomationExecutionLedger.Result.FAILED -> "မအောင်မြင်ပါ"
+                        AutomationExecutionLedger.Result.INTERRUPTED -> "လုပ်ဆောင်နေစဉ် ရပ်သွားသည်"
+                        null -> null
+                    }
+                    if (last != null) holder.tvTime.append("\nနောက်ဆုံးအကြိမ် — $last")
 
                     // Action Badges
                     val badges = mutableListOf<String>()

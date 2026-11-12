@@ -2,6 +2,11 @@ package com.example.voicebrainlive.commands
 
 import android.content.Context
 import android.media.AudioManager
+import com.example.voicebrainlive.MediaSessionHelper
+import com.example.voicebrainlive.routines.SleepWakeGraph
+import com.example.voicebrainlive.routines.SleepWakeKind
+import com.example.voicebrainlive.routines.SleepWakeState
+import kotlinx.coroutines.delay
 
 /** Read back only explicit local device goals after the existing common guard has dispatched.
  * Opaque provider/media/app results still stop the runner; a success string is never evidence.
@@ -40,6 +45,24 @@ internal class MacroDeviceVerification(private val context: Context) {
                 val expected = (max * percent / 150).coerceIn(0, max)
                 ({ audio.getStreamVolume(AudioManager.STREAM_MUSIC) == expected })
             }
+            "set_music_sleep_timer" -> {
+                val minutes = leaf.value?.toIntOrNull()?.takeIf { it in 1..180 } ?: return null
+                val now = SleepWakeGraph.now(context)
+                val due = now.elapsed + minutes * 60_000L
+                ({
+                    SleepWakeGraph.journal(context).history().any {
+                        it.kind == SleepWakeKind.MEDIA_STOP && it.state == SleepWakeState.SCHEDULED &&
+                            it.boot == now.boot && it.elapsedDue in (due - 15_000)..(due + 5_000)
+                    }
+                })
+            }
+            "play_music", "play_spotify", "media_play" -> {
+                // For a search, a player already playing before dispatch cannot verify the new request.
+                val wasPlaying = MediaSessionHelper.isSpotifyOrMusicPlaying(context)
+                val resume = leaf.target.isNullOrBlank() && leaf.value.isNullOrBlank()
+                if (wasPlaying && !resume) return null
+                ({ MediaSessionHelper.isSpotifyOrMusicPlaying(context) })
+            }
             else -> null
         }
     }
@@ -51,7 +74,16 @@ internal class MacroDeviceVerification(private val context: Context) {
             return result
         }
         if (verify != null) {
-            return if (try { verify() } catch (_: Exception) { false })
+            var verified = runCatching { verify() }.getOrDefault(false)
+            if (!verified && leaf.command in setOf("play_music", "play_spotify", "media_play")) {
+                repeat(6) {
+                    if (!verified) {
+                        delay(250)
+                        verified = runCatching { verify() }.getOrDefault(false)
+                    }
+                }
+            }
+            return if (verified)
                 MacroLeafResult(MacroOutcomeStatus.VERIFIED, result.message)
             else MacroLeafResult(MacroOutcomeStatus.UNVERIFIED, result.message + "\nDevice state could not be verified; remaining steps did not run.")
         }

@@ -14,6 +14,17 @@ import java.util.Calendar
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
 class SamsungModesAndRoutinesTest {
+    @Test
+    fun savedTriggerFindsExactlyOneEnabledRoutine() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val item = RoutineStorage.add(context, "work", 8, 30, name = "အလုပ်", triggerPhrase = "အလုပ်ဝင်တော့မယ်")
+        assertEquals(item.id, RoutineStorage.findVoiceRoutine(context, "အလုပ်ဝင်တော့မယ်။")?.id)
+        assertEquals(item.id, RoutineStorage.findVoiceRoutine(context, "လုပ်ရိုးလုပ်စဉ် အလုပ်")?.id)
+        val duplicate = RoutineStorage.add(context, "focus", 9, 30, triggerPhrase = "အလုပ်ဝင်တော့မယ်")
+        assertEquals(null, RoutineStorage.findVoiceRoutine(context, "အလုပ်ဝင်တော့မယ်"))
+        RoutineStorage.setEnabled(context, duplicate.id, false)
+        assertEquals(item.id, RoutineStorage.findVoiceRoutine(context, "အလုပ်ဝင်တော့မယ်")?.id)
+    }
 
     @Test
     fun testNextTriggerTimeEveryday() {

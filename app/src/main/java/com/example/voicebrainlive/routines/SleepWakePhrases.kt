@@ -59,13 +59,27 @@ class SleepWakeTranscript {
     private var text=""
     private var newTurn=false
     private var overflow=false
+    private var toolQueued = false
+    private var automationQueued = false
     fun input(fragment:String){
-        if(newTurn){text="";overflow=false;newTurn=false}
+        if(newTurn){text="";overflow=false;newTurn=false;toolQueued=false;automationQueued=false}
         if(overflow)return
         val next=when{ text.isEmpty()->fragment;fragment.startsWith(text)->fragment;text.endsWith(fragment)->text;else->text+fragment }
         if(next.length>300){text="";overflow=true}else text=next
     }
     fun finish(){newTurn=true}
+    fun takeAutomationInput(): String? {
+        if (newTurn || overflow || toolQueued || text.isBlank()) return null
+        toolQueued = true
+        automationQueued = true
+        return text
+    }
+    fun admitNormalTool(): Boolean {
+        if (newTurn) return true
+        if (automationQueued) return false
+        toolQueued = true
+        return true
+    }
     fun recipe()=if(overflow)null else SleepWakePhrases.match(text)
         ?:com.example.voicebrainlive.OfflineCommandMatcher.matchDirectAction(text)?.takeIf{it.first=="set_alarm"}
 }

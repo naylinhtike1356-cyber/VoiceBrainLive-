@@ -13,6 +13,21 @@ import java.util.Calendar
  * Supports daily, weekly, and custom multi-day schedules (e.g. Weekdays, Weekends, Mon/Wed/Fri).
  */
 object RoutineScheduler {
+    enum class Timing { EXACT, APPROXIMATE, UNSCHEDULED }
+    data class Schedule(val at: Long, val timing: Timing)
+
+    fun currentSchedule(context: Context, id: Int): Schedule? {
+        val prefs = context.getSharedPreferences("routine_schedule_state", Context.MODE_PRIVATE)
+        val at = prefs.getLong("at_$id", 0L)
+        val timing = Timing.entries.firstOrNull { it.name == prefs.getString("timing_$id", null) }
+            ?: return null
+        return Schedule(at, timing)
+    }
+
+    private fun recordSchedule(context: Context, id: Int, at: Long, timing: Timing) {
+        context.getSharedPreferences("routine_schedule_state", Context.MODE_PRIVATE)
+            .edit().putLong("at_$id", at).putString("timing_$id", timing.name).apply()
+    }
 
     private const val REQUEST_CODE_BASE = 90000  // Avoid collision with reminder IDs
     private const val REQUEST_CODE_PRE_BASE = 91000
@@ -20,6 +35,7 @@ object RoutineScheduler {
     fun schedule(context: Context, item: RoutineStorage.RoutineItem) {
         if (!item.enabled) {
             cancel(context, item.id)
+            recordSchedule(context, item.id, 0, Timing.UNSCHEDULED)
             return
         }
         // Replacing a schedule must retire its old pre-reminder, including when it was removed.
@@ -27,6 +43,7 @@ object RoutineScheduler {
         val triggerTime = nextTriggerTime(item.hour, item.minute, item.repeatDays, item.dayOfWeek)
         val intent = Intent(context, RoutineReceiver::class.java).apply {
             action = RoutineReceiver.ACTION_ROUTINE
+            putExtra(RoutineReceiver.EXTRA_OCCURRENCE, triggerTime)
             putExtra(MainActivity.EXTRA_AUTOMATION_ID, item.id)
             putExtra(MainActivity.EXTRA_AUTOMATION_TYPE, item.type)
             putExtra(MainActivity.EXTRA_AUTOMATION_MESSAGE, item.message)
@@ -44,26 +61,33 @@ object RoutineScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        try {
+        val timing = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
                     alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pending)
+                    Timing.EXACT
                 } else {
                     alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pending)
+                    Timing.APPROXIMATE
                 }
             } else {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pending)
+                Timing.EXACT
             }
-            android.util.Log.d("RoutineScheduler", "scheduled id=${item.id} at ${item.hour}:${item.minute} trigger=${triggerTime}")
-        } catch (e: Exception) {
-            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pending)
+        } catch (_: RuntimeException) {
+            runCatching { alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pending) }
+                .fold({ Timing.APPROXIMATE }, { Timing.UNSCHEDULED })
         }
+        recordSchedule(context, item.id, triggerTime, timing)
+        if (timing == Timing.UNSCHEDULED) return
 
         // Optional pre-reminder (verbal) before the main trigger.
         if (item.reminderMinutesBefore > 0 && item.reminderText.isNotBlank()) {
             val preTime = (triggerTime - item.reminderMinutesBefore * 60_000L).coerceAtLeast(System.currentTimeMillis() + 1_000L)
             val preIntent = Intent(context, RoutineReceiver::class.java).apply {
                 action = RoutineReceiver.ACTION_ROUTINE_PRE
+                putExtra(RoutineReceiver.EXTRA_OCCURRENCE, triggerTime)
+                putExtra(MainActivity.EXTRA_AUTOMATION_SPEAK, item.useLiveAgent)
                 putExtra(MainActivity.EXTRA_AUTOMATION_ID, item.id)
                 putExtra(MainActivity.EXTRA_AUTOMATION_TYPE, item.type)
                 putExtra(MainActivity.EXTRA_AUTOMATION_MESSAGE, item.message)
@@ -84,8 +108,8 @@ object RoutineScheduler {
                 } else {
                     alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preTime, prePending)
                 }
-            } catch (_: Exception) {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, preTime, prePending)
+            } catch (_: RuntimeException) {
+                runCatching { alarmManager.set(AlarmManager.RTC_WAKEUP, preTime, prePending) }
             }
         }
     }
