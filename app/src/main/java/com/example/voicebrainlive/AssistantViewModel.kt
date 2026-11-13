@@ -80,11 +80,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (service != null) {
             service.sendTextInput(text)
         } else {
-            val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(app, text)
-            if (routine != null || OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
+            val hasRoutine = com.example.voicebrainlive.routines.RoutineStorage.matchingVoiceRoutines(app, text).isNotEmpty()
+            if (hasRoutine || OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
                 val executor = phoneExecutor
                 viewModelScope.launch {
-                    val result = routine?.let { com.example.voicebrainlive.usecases.AutomationCommandRunner(app).run(it) }
+                    val result = com.example.voicebrainlive.usecases.AutomationCommandRunner(app).runVoiceRoutine(text)
                         ?: com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
                         { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,

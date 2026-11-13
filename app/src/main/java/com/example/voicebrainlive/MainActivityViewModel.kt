@@ -69,13 +69,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         _uiState.update { state }
     }
 
-    fun hasUsableGeminiApiKey(): Boolean {
-        val key = SettingsActivity.getGeminiApiKey(app).trim()
-        return key.isNotBlank() &&
-            key != "YOUR_API_KEY" &&
-            key != "YOUR_API_KEY_HERE" &&
-            key.length >= 20
-    }
+    fun hasUsableGeminiApiKey(): Boolean = SettingsActivity.hasUsableGeminiApiKey(app)
 
     private val app = application
 
@@ -114,7 +108,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
     // FIX: Declare variables BEFORE callbacks so they can be captured
     private var currentAiResponse = ""
     private var currentUserInput = "🎤"
-    private val currentSessionId = "main_${System.currentTimeMillis()}"
+    private val currentSessionId = SimpleConversationStorage.MAIN_CHAT_SESSION
 
     fun getChatSessionId(): String = currentSessionId
 
@@ -128,8 +122,8 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
     suspend fun executeLocalTextCommand(text: String): String = withContext(Dispatchers.IO) {
         UserUtteranceContext.set(text)
         val executor = ensurePhoneExecutor()
-        com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(app, text)?.let {
-            return@withContext formatLocalCommandResult(com.example.voicebrainlive.usecases.AutomationCommandRunner(app).run(it))
+        com.example.voicebrainlive.usecases.AutomationCommandRunner(app).runVoiceRoutine(text)?.let {
+            return@withContext formatLocalCommandResult(it)
         }
         com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
             { phoneExecutor === executor },executor::executeAsync)?.let{return@withContext formatLocalCommandResult(it)}
@@ -164,8 +158,7 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
             // Explicit local controls precede learning, connectivity checks and every model/planner.
             val executor = ensurePhoneExecutor()
             val reviewedCall=com.example.voicebrainlive.commands.ReviewedCallInput.target(trimmed)!=null
-            val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(app, trimmed)
-            val direct = routine?.let { com.example.voicebrainlive.usecases.AutomationCommandRunner(app).run(it) }
+            val direct = com.example.voicebrainlive.usecases.AutomationCommandRunner(app).runVoiceRoutine(trimmed)
                 ?: com.example.voicebrainlive.commands.ReviewedCallInput.execute(trimmed,
                 { phoneExecutor === executor },executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(trimmed,
                 { phoneExecutor === executor }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(trimmed,

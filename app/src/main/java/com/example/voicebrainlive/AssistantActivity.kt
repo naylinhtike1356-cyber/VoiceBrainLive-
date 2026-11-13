@@ -756,10 +756,16 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
             action = VoiceLiveService.ACTION_START
             putExtra("EXTRA_POWER_BUTTON", true)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: RuntimeException) {
+            Log.w("AssistantActivity", "Unable to start live microphone service", e)
+            onError("အသံဝန်ဆောင်မှု စတင်၍မရပါ။ အက်ပ်ဖွင့်ထားပြီး ပြန်စမ်းပါ။")
+            return
         }
 
         VoiceLiveService.isUiVisible = true

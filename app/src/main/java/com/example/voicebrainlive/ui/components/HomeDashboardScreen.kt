@@ -18,6 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,8 @@ data class PendingTaskCardModel(
     val type: String = "reminder"
 )
 
+enum class HomeConnectionState { READY, CONNECTING, ERROR, OFFLINE, SETUP_REQUIRED }
+
 @Composable
 fun HomeDashboardScreen(
     statusText: String,
@@ -60,11 +65,14 @@ fun HomeDashboardScreen(
     dashboardItems: List<DashboardItem>,
     pendingTasks: List<PendingTaskCardModel> = emptyList(),
     onTaskClick: (PendingTaskCardModel) -> Unit = {},
-    onViewAllTasks: () -> Unit = onQuickAutomate
+    onViewAllTasks: () -> Unit = onQuickAutomate,
+    connectionState: HomeConnectionState = HomeConnectionState.READY,
+    onSetupClick: () -> Unit = {}
 ) {
     var textInput by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
     val isActive = voiceStatus != VoiceStatus.IDLE
+    val voiceBusy = connectionState == HomeConnectionState.CONNECTING || voiceStatus == VoiceStatus.PROCESSING
 
     // Contextual Burmese Greeting
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
@@ -76,11 +84,17 @@ fun HomeDashboardScreen(
     }
 
     // Dynamic Readiness Chip Attributes
-    val (statusDotColor, statusLabel) = when (voiceStatus) {
-        VoiceStatus.LISTENING -> VoiceBrainSecondary to "နားထောင်နေသည် • Listening"
-        VoiceStatus.SPEAKING -> VoiceBrainSecondary to "ရှင်းပြနေသည် • Speaking"
-        VoiceStatus.PROCESSING -> VoiceBrainWarning to "စဉ်းစားနေသည် • Thinking"
-        VoiceStatus.IDLE -> VoiceBrainSuccess to "အသင့်ရှိသည် • Ready"
+    val (statusDotColor, statusLabel) = when (connectionState) {
+        HomeConnectionState.CONNECTING -> VoiceBrainWarning to "ချိတ်ဆက်နေသည်"
+        HomeConnectionState.ERROR -> VoiceBrainError to "ချိတ်ဆက်မှု ပြဿနာ"
+        HomeConnectionState.OFFLINE -> VoiceBrainWarning to "အင်တာနက် မရှိပါ"
+        HomeConnectionState.SETUP_REQUIRED -> VoiceBrainWarning to "Gemini Key လိုအပ်သည်"
+        HomeConnectionState.READY -> when (voiceStatus) {
+            VoiceStatus.LISTENING -> VoiceBrainSecondary to "နားထောင်နေသည်"
+            VoiceStatus.SPEAKING -> VoiceBrainPrimaryLight to "ဖြေကြားနေသည်"
+            VoiceStatus.PROCESSING -> VoiceBrainWarning to "စဉ်းစားနေသည်"
+            VoiceStatus.IDLE -> VoiceBrainSuccess to "အသင့်ရှိသည်"
+        }
     }
 
     // Ambient breathing pulse for orb
@@ -166,7 +180,7 @@ fun HomeDashboardScreen(
         // ── 2. HERO VOICE CENTER (Compact Fluid Orb + CTA) ─────────────
         Box(
             modifier = Modifier
-                .size(190.dp)
+                .size(240.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
@@ -177,8 +191,7 @@ fun HomeDashboardScreen(
                             Color.Transparent
                         )
                     )
-                )
-                .clickable { onMicClick() },
+                ),
             contentAlignment = Alignment.Center
         ) {
             AssistantFluidOrb(status = voiceStatus)
@@ -187,37 +200,38 @@ fun HomeDashboardScreen(
         Spacer(Modifier.height(14.dp))
 
         // Primary Action Button (28dp Pill)
-        val (ctaColor, ctaIcon, ctaText) = when (voiceStatus) {
-            VoiceStatus.LISTENING -> Triple(VoiceBrainError, "⏹️", "နားထောင်နေသည် (ရပ်ရန် နှိပ်ပါ)")
-            VoiceStatus.SPEAKING -> Triple(VoiceBrainSecondary, "⏹️", "ရှင်းပြနေသည် (ရပ်ရန် နှိပ်ပါ)")
-            VoiceStatus.PROCESSING -> Triple(VoiceBrainWarning, "⏳", "စဉ်းစားနေပါသည်...")
-            VoiceStatus.IDLE -> Triple(VoiceBrainPrimary, "🎙️", "စကားပြောရန် နှိပ်ပါ (Tap to talk)")
+        val ctaText = when {
+            connectionState == HomeConnectionState.CONNECTING -> "ချိတ်ဆက်နေသည်"
+            voiceStatus == VoiceStatus.PROCESSING -> "စဉ်းစားနေသည်"
+            isActive -> "အသံ ရပ်မည်"
+            connectionState == HomeConnectionState.ERROR -> "ပြန်ချိတ်ဆက်မည်"
+            connectionState in setOf(HomeConnectionState.OFFLINE, HomeConnectionState.SETUP_REQUIRED) ->
+                "ဖုန်းအမိန့် ပြောမည်"
+            else -> "စကားပြောမည်"
         }
 
-        Surface(
+        Column(horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+        ) {
+            if (statusText.isNotBlank()) {
+                Text(statusText, color = VoiceBrainTextSecondary, fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 10.dp))
+            }
+            if (connectionState == HomeConnectionState.SETUP_REQUIRED) {
+                TextButton(onClick = onSetupClick) { Text("Gemini API Key ထည့်မည်", color = VoiceBrainPrimaryLight) }
+            }
+        }
+
+        Button(
+            onClick = onMicClick,
+            enabled = !voiceBusy,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .clickable { onMicClick() },
-            color = ctaColor,
+                .heightIn(min = 52.dp),
             shape = RoundedCornerShape(28.dp),
-            shadowElevation = 4.dp
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D42C8), contentColor = Color.White)
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(text = ctaIcon, fontSize = 18.sp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = ctaText,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(ctaText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
 
         // Wake word hint

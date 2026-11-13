@@ -53,6 +53,13 @@ class SettingsActivity : FragmentActivity() {
     }
 
     companion object {
+        private const val EXTRA_GEMINI_SETUP = "gemini_setup"
+
+        fun geminiSetupIntent(context: Context): Intent =
+            Intent(context, SettingsActivity::class.java).putExtra(EXTRA_GEMINI_SETUP, true)
+
+        fun hasUsableGeminiApiKey(context: Context): Boolean =
+            getGeminiApiKey(context).trim().length >= 20
         private const val PREFS_NAME = "secure_settings"
         const val KEY_GEMINI_API = "gemini_api_key"
         const val KEY_GEMINI_MODEL = "gemini_model"
@@ -1067,7 +1074,14 @@ class SettingsActivity : FragmentActivity() {
         setupSectionToggle(binding.headerCategoryMemory, binding.bodyCategoryMemory, binding.arrowCategoryMemory, binding.dividerCategoryMemory)
         setupSectionToggle(binding.headerCategoryAdvanced, binding.bodyCategoryAdvanced, binding.arrowCategoryAdvanced, binding.dividerCategoryAdvanced)
 
-        // All sections remain collapsed by default on open for a clean, stable UI
+        if (intent.getBooleanExtra(EXTRA_GEMINI_SETUP, false) || !hasUsableGeminiApiKey(this)) {
+            binding.headerCategoryApis.performClick()
+            if (intent.getBooleanExtra(EXTRA_GEMINI_SETUP, false)) {
+                binding.settingsScroll.post {
+                    binding.settingsScroll.smoothScrollTo(0, binding.headerCategoryApis.top)
+                }
+            }
+        }
     }
 
     private fun setupSectionToggle(header: View, body: View, arrow: ImageView, divider: View?) {

@@ -1066,12 +1066,12 @@ class VoiceLiveService : Service() {
 
     fun sendTextInput(text: String) {
         currentUserInput = if (com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null) "ခေါ်ဆိုရန် အတည်ပြုချက်" else "⌨️ $text"
-        val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(this, text)
-        if (routine != null || OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
+        val hasRoutine = com.example.voicebrainlive.routines.RoutineStorage.matchingVoiceRoutines(this, text).isNotEmpty()
+        if (hasRoutine || OfflineCommandMatcher.matchDirectAction(text) != null || com.example.voicebrainlive.commands.ReviewedCallInput.target(text) != null || com.example.voicebrainlive.commands.CompoundCommandExecutor.parseSteps(text) != null) {
             // This method receives direct user text, never model/proactive tool-result text.
             val executor = phoneExecutor ?: PhoneCommandExecutor(this).also { phoneExecutor = it }
             serviceScope.launch {
-                val result = routine?.let { com.example.voicebrainlive.usecases.AutomationCommandRunner(this@VoiceLiveService).run(it) }
+                val result = com.example.voicebrainlive.usecases.AutomationCommandRunner(this@VoiceLiveService).runVoiceRoutine(text)
                     ?: com.example.voicebrainlive.commands.ReviewedCallInput.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.OfflineDirectCommands.execute(text,
                     { phoneExecutor === executor && serviceJob.isActive }, executor::executeAsync) ?: com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(text,

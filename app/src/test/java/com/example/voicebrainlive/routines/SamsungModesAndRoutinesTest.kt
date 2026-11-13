@@ -22,6 +22,11 @@ class SamsungModesAndRoutinesTest {
         assertEquals(item.id, RoutineStorage.findVoiceRoutine(context, "လုပ်ရိုးလုပ်စဉ် အလုပ်")?.id)
         val duplicate = RoutineStorage.add(context, "focus", 9, 30, triggerPhrase = "အလုပ်ဝင်တော့မယ်")
         assertEquals(null, RoutineStorage.findVoiceRoutine(context, "အလုပ်ဝင်တော့မယ်"))
+        val blocked = kotlinx.coroutines.runBlocking {
+            com.example.voicebrainlive.usecases.AutomationCommandRunner(context)
+                .runVoiceRoutine("အလုပ်ဝင်တော့မယ်")
+        }
+        assertTrue(blocked.orEmpty().startsWith("BLOCKED:"))
         RoutineStorage.setEnabled(context, duplicate.id, false)
         assertEquals(item.id, RoutineStorage.findVoiceRoutine(context, "အလုပ်ဝင်တော့မယ်")?.id)
     }

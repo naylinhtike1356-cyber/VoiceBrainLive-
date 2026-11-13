@@ -13,6 +13,7 @@ import java.io.File
  * Call from Dispatchers.IO.
  */
 object SimpleConversationStorage {
+    const val MAIN_CHAT_SESSION = "main_chat"
 
     private const val MAX_TURNS = 350
     private const val MAX_FOR_CONTEXT = 24
@@ -80,6 +81,21 @@ object SimpleConversationStorage {
                 emptyList()
             }
         }
+    }
+
+    /** Load the visible session, including earlier Main chat sessions when applicable. */
+    suspend fun getSessionTurns(context: Context, sessionId: String): List<TurnRecord> {
+        if (sessionId.isBlank()) return emptyList()
+        migrateFromFileIfNeeded(context)
+        return dao(context).getSessionTurns(sessionId, sessionId == MAIN_CHAT_SESSION, 100)
+            .asReversed().map { TurnRecord(it.sessionId, it.role, it.content, it.timestamp) }
+    }
+
+    suspend fun clearSession(context: Context, sessionId: String) {
+        require(sessionId.isNotBlank())
+        migrateFromFileIfNeeded(context)
+        dao(context).deleteSessionTurns(sessionId, sessionId == MAIN_CHAT_SESSION)
+        SessionContextProvider.invalidateCache(context)
     }
 
     /** Clear all conversation logs and invalidate cache */

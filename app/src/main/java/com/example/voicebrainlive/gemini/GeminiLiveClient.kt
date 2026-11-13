@@ -410,7 +410,7 @@ class GeminiLiveClient(
                 put("properties", JSONObject().apply {
                     put("command_type", JSONObject().apply {
                         put("type", "string")
-                        put("description", "For a saved routine or its spoken trigger use run_saved_routine once. For multiple immediate phone actions use run_compound_command once. Both use the user's actual speech transcript. Omit target and value and do not dispatch individual actions for the same request.")
+                        put("description", "For a saved routine, its spoken trigger, or an explicit Work or Bedtime mode request (e.g. အလုပ်ဝင်တော့မယ် or အိပ်တော့မယ်), use run_saved_routine once. For multiple immediate phone actions use run_compound_command once. Both use the user's actual speech transcript. Omit target and value and do not dispatch individual actions for the same request.")
                         put("enum", org.json.JSONArray().apply {
                             put("make_call")
                             put("call_contact")
@@ -977,9 +977,8 @@ class GeminiLiveClient(
                 val context = automationContext
                     ?: return "BLOCKED: ဒီ session မှာ Routine ကို အသုံးမပြုနိုင်ပါ။"
                 if (command == "run_saved_routine") {
-                    val routine = com.example.voicebrainlive.routines.RoutineStorage.findVoiceRoutine(context, input)
-                        ?: return "BLOCKED: ဖွင့်ထားတဲ့ Routine အမည် သို့မဟုတ် သိမ်းထားတဲ့ စကားစုကို ပြန်ပြောပေးပါ။"
-                    return com.example.voicebrainlive.usecases.AutomationCommandRunner(context).run(routine)
+                    return com.example.voicebrainlive.usecases.AutomationCommandRunner(context).runVoiceRoutine(input)
+                        ?: "BLOCKED: ဖွင့်ထားတဲ့ Routine အမည် သို့မဟုတ် သိမ်းထားတဲ့ စကားစုကို ပြန်ပြောပေးပါ။"
                 }
                 return com.example.voicebrainlive.commands.CompoundCommandExecutor.execute(
                     input, { connectionEpoch.current(epoch) }, onExecutePhoneCommand

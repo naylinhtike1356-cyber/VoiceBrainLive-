@@ -4,6 +4,7 @@ import com.example.voicebrainlive.OfflineCommandMatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 import java.text.Normalizer
 import java.util.Locale
 
@@ -151,7 +152,9 @@ object CompoundCommandExecutor {
             currentCoroutineContext().ensureActive()
             if (!current()) return "BLOCKED:STALE_DIRECT_INPUT"
             try {
-                val rawResult = dispatch(step.first, step.second, step.third)
+                val rawResult = withTimeoutOrNull(8_000L) {
+                    dispatch(step.first, step.second, step.third)
+                } ?: "UNVERIFIED: သတ်မှတ်ချိန်အတွင်း ရလဒ်မရရှိပါ။"
                 results.add("${results.size + 1}. ${CommandResultFormatter.format(rawResult)}")
                 if (step.first == "make_call" || rawResult.isBlank() ||
                     listOf("BLOCKED:", "FAILED", "NEEDS_APPROVAL:", "UNVERIFIED:").any(rawResult::startsWith)) {

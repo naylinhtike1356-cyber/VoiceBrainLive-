@@ -128,15 +128,7 @@ class AutomationActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 Toast.makeText(this@AutomationActivity, "🌙 အိပ်စက်ချိန် မုဒ် စတင်နေပါသည်...", Toast.LENGTH_SHORT).show()
                 val runner = AutomationCommandRunner(this@AutomationActivity)
-                runner.run(
-                    type = "bedtime",
-                    message = "အိပ်ရာဝင်ချိန်",
-                    musicQuery = "အိပ်ရာဝင်သီချင်း",
-                    ringerMode = "silent",
-                    volumePercent = 20,
-                    sleepTimerMinutes = 30
-                )
-                Toast.makeText(this@AutomationActivity, "🌙 အိပ်စက်ချိန် မုဒ် ဖွင့်ပြီးပါပြီ (သီချင်း ၃၀ မိနစ်ကြာလျှင် အလိုအလျောက် ပိတ်မည်)", Toast.LENGTH_LONG).show()
+                showQuickModeResult(runner.runQuickMode("bedtime_mode"))
             }
         }
         binding.btnConfigBedtime.setOnClickListener {
@@ -161,14 +153,7 @@ class AutomationActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 Toast.makeText(this@AutomationActivity, "💼 အလုပ်ခွင် မုဒ် စတင်နေပါသည်...", Toast.LENGTH_SHORT).show()
                 val runner = AutomationCommandRunner(this@AutomationActivity)
-                runner.run(
-                    type = "work",
-                    message = "အလုပ်ခွင်",
-                    musicQuery = "ပျော်ရွှင်စေမည့်သီချင်း",
-                    ringerMode = "silent",
-                    volumePercent = 50
-                )
-                Toast.makeText(this@AutomationActivity, "💼 အလုပ်ခွင် မုဒ် ဖွင့်ပြီးပါပြီ (စိုင်းလန့် + အသံ ၅၀% + သီချင်းဖွင့်)", Toast.LENGTH_LONG).show()
+                showQuickModeResult(runner.runQuickMode("work_mode"))
             }
         }
         binding.btnConfigWork.setOnClickListener {
@@ -194,14 +179,14 @@ class AutomationActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 Toast.makeText(this@AutomationActivity, "🧘 အာရုံစိုက် မုဒ် စတင်နေပါသည်...", Toast.LENGTH_SHORT).show()
                 val runner = AutomationCommandRunner(this@AutomationActivity)
-                runner.run(
+                val result = runner.run(
                     type = "focus",
                     message = "အာရုံစိုက်ချိန်",
                     musicQuery = "study focus ambient music",
                     ringerMode = "silent",
                     volumePercent = 40
                 )
-                Toast.makeText(this@AutomationActivity, "🧘 အာရုံစိုက် မုဒ် ဖွင့်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+                showQuickModeResult(result)
             }
         }
 
@@ -216,8 +201,7 @@ class AutomationActivity : AppCompatActivity() {
                     ringerMode = "normal",
                     volumePercent = 70
                 )
-                val msg = if (res.isNotBlank()) res else "🌅 မနက်ခင်း မုဒ် အောင်မြင်ပါသည်"
-                Toast.makeText(this@AutomationActivity, msg, Toast.LENGTH_LONG).show()
+                showQuickModeResult(res)
             }
         }
     }
@@ -254,6 +238,14 @@ class AutomationActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("hub_tab", selectedTab)
         super.onSaveInstanceState(outState)
+    }
+
+    private fun showQuickModeResult(result: String) {
+        AlertDialog.Builder(this)
+            .setTitle("မုဒ် လုပ်ဆောင်ချက်ရလဒ်")
+            .setMessage(com.example.voicebrainlive.commands.CommandResultFormatter.format(result))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun selectTab(position: Int) {

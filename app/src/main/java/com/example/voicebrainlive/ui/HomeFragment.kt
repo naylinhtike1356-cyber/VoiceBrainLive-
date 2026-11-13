@@ -2,6 +2,11 @@ package com.example.voicebrainlive.ui
 
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -13,8 +18,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -22,111 +30,143 @@ import com.example.voicebrainlive.*
 import com.example.voicebrainlive.R
 import com.example.voicebrainlive.ui.components.DashboardItem
 import com.example.voicebrainlive.ui.components.HomeDashboardScreen
+import com.example.voicebrainlive.ui.components.HomeConnectionState
 import com.example.voicebrainlive.ui.components.VoiceStatus
+import com.example.voicebrainlive.ui.theme.VoiceBrainLiveTheme
 import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
 
     private val viewModel: MainActivityViewModel by activityViewModels()
+    private var hasGeminiKey by mutableStateOf(false)
+    private var online by mutableStateOf(false)
+    private var offlineRecognizer: SpeechRecognizer? = null
+    private var offlineListening by mutableStateOf(false)
+    private val offlineMicPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (view == null) return@registerForActivityResult
+        if (granted) startOfflineVoice()
+        else viewModel.updateStatus(getString(R.string.mic_permission_required))
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         (activity as? InteractiveBetaHost)?.let { return it.betaHomeView() }
+        val appContext = requireContext().applicationContext
+        val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+        online = NetworkUtils.isOnline(appContext)
         return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                val uiState by viewModel.uiState.collectAsState(initial = AssistantState.Idle)
-                val transcript by viewModel.transcript.collectAsState(initial = "")
-                val statusMessage by viewModel.statusMessage.collectAsState(initial = getString(R.string.tap_to_start))
-
-                val voiceStatus = when (uiState) {
-                    is AssistantState.Listening -> VoiceStatus.LISTENING
-                    is AssistantState.Speaking -> VoiceStatus.SPEAKING
-                    is AssistantState.Processing -> VoiceStatus.PROCESSING
-                    else -> VoiceStatus.IDLE
-                }
-
-                val isWakeActive = WakeWordPrefs.isEnabled(requireContext())
-                val powerManager = requireContext().getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
-                val isBatteryOptimized = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    powerManager?.isIgnoringBatteryOptimizations(requireContext().packageName) != true
-                } else true
-
-                val pendingTasks = remember(uiState) { loadPendingTasks(requireContext()) }
-
-                HomeDashboardScreen(
-                    statusText = statusMessage,
-                    transcriptText = transcript,
-                    voiceStatus = voiceStatus,
-                    wakeWordActive = isWakeActive,
-                    batteryOptimized = isBatteryOptimized,
-                    pendingTasks = pendingTasks,
-                    onTaskClick = { task ->
-                        performHaptic()
-                        startActivity(Intent(context, AutomationActivity::class.java))
-                    },
-                    onViewAllTasks = {
-                        performHaptic()
-                        startActivity(Intent(context, AutomationActivity::class.java))
-                    },
-                    onMicClick = {
-                        performHaptic()
-                        if (!NetworkUtils.isOnline(requireContext()) || !viewModel.hasUsableGeminiApiKey()) {
-                            startOfflineVoice()
-                        } else {
-                            if (uiState is AssistantState.Listening || uiState is AssistantState.Speaking) {
-                                viewModel.stopListening()
-                            } else {
-                                viewModel.connect(requestMic = true)
+                VoiceBrainLiveTheme(darkTheme = true, dynamicColor = false) {
+                    DisposableEffect(connectivity) {
+                        val callback = object : ConnectivityManager.NetworkCallback() {
+                            private fun refresh() {
+                                post { online = NetworkUtils.isOnline(appContext) }
                             }
+                            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = refresh()
+                            override fun onLost(network: Network) = refresh()
                         }
-                    },
-                    onTextSubmit = { text ->
+                        connectivity?.registerDefaultNetworkCallback(callback)
+                        onDispose { connectivity?.unregisterNetworkCallback(callback) }
+                    }
+                    val uiState by viewModel.uiState.collectAsState(initial = AssistantState.Idle)
+                    val transcript by viewModel.transcript.collectAsState(initial = "")
+                    val statusMessage by viewModel.statusMessage.collectAsState(initial = getString(R.string.tap_to_start))
+
+                    val voiceStatus = when (if (offlineListening) AssistantState.Listening else uiState) {
+                        is AssistantState.Listening -> VoiceStatus.LISTENING
+                        is AssistantState.Speaking -> VoiceStatus.SPEAKING
+                        is AssistantState.Processing -> VoiceStatus.PROCESSING
+                        else -> VoiceStatus.IDLE
+                    }
+                    val connectionState = when {
+                        !online -> HomeConnectionState.OFFLINE
+                        !hasGeminiKey -> HomeConnectionState.SETUP_REQUIRED
+                        uiState is AssistantState.Connecting -> HomeConnectionState.CONNECTING
+                        uiState is AssistantState.Error -> HomeConnectionState.ERROR
+                        else -> HomeConnectionState.READY
+                    }
+                    val onVoiceAction = {
                         performHaptic()
-                        if (text.isNotBlank()) {
-                            sendText(text)
+                        when {
+                            offlineListening -> stopOfflineVoice()
+                            uiState is AssistantState.Listening || uiState is AssistantState.Speaking ->
+                                viewModel.stopListening()
+                            uiState is AssistantState.Connecting || uiState is AssistantState.Processing -> Unit
+                            !NetworkUtils.isOnline(appContext) || !viewModel.hasUsableGeminiApiKey() -> startOfflineVoice()
+                            else -> viewModel.connect(requestMic = true)
                         }
-                    },
-                    onQuickAsk = {
-                        performHaptic()
-                        if (!NetworkUtils.isOnline(requireContext()) || !viewModel.hasUsableGeminiApiKey()) {
-                            startOfflineVoice()
-                        } else {
-                            viewModel.connect(requestMic = true)
-                        }
-                    },
-                    onQuickRemember = {
-                        performHaptic()
-                        startActivity(Intent(context, com.example.voicebrainlive.ui.MemoryManagerActivity::class.java))
-                    },
-                    onQuickAutomate = {
-                        performHaptic()
-                        startActivity(Intent(context, AutomationActivity::class.java))
-                    },
-                    onStatusCardClick = {
-                        performHaptic()
-                        startActivity(Intent(context, SettingsActivity::class.java))
-                    },
-                    dashboardItems = listOf(
-                        DashboardItem("🔔", "သတိပေးချက်များ", R.drawable.ic_reminder) {
-                            performHaptic()
-                            startActivity(Intent(context, RemindersActivity::class.java))
+                    }
+
+                    val isWakeActive = WakeWordPrefs.isEnabled(requireContext())
+                    val powerManager = requireContext().getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                    val isBatteryOptimized = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                        powerManager?.isIgnoringBatteryOptimizations(requireContext().packageName) != true
+                    } else true
+
+                    val pendingTasks = remember(uiState) { loadPendingTasks(requireContext()) }
+
+                    HomeDashboardScreen(
+                        statusText = statusMessage,
+                        connectionState = connectionState,
+                        onSetupClick = {
+                            startActivity(SettingsActivity.geminiSetupIntent(requireContext()))
                         },
-                        DashboardItem("📝", "မှတ်စုနှင့် Notion", R.drawable.ic_notes) {
+                        transcriptText = transcript,
+                        voiceStatus = voiceStatus,
+                        wakeWordActive = isWakeActive,
+                        batteryOptimized = isBatteryOptimized,
+                        pendingTasks = pendingTasks,
+                        onTaskClick = { task ->
                             performHaptic()
-                            startActivity(Intent(context, NotesActivity::class.java))
+                            startActivity(Intent(context, AutomationActivity::class.java))
                         },
-                        DashboardItem("👥", "အဆက်အသွယ်များ", R.drawable.ic_contacts) {
+                        onViewAllTasks = {
                             performHaptic()
-                            startActivity(Intent(context, ContactsActivity::class.java))
+                            startActivity(Intent(context, AutomationActivity::class.java))
                         },
-                        DashboardItem("🕒", "ပြောဆိုမှတ်တမ်း", R.drawable.ic_history) {
+                        onMicClick = onVoiceAction,
+                        onTextSubmit = { text ->
                             performHaptic()
-                            startActivity(Intent(context, HistoryActivity::class.java))
-                        }
+                            if (text.isNotBlank()) {
+                                sendText(text)
+                            }
+                        },
+                        onQuickAsk = onVoiceAction,
+                        onQuickRemember = {
+                            performHaptic()
+                            startActivity(Intent(context, com.example.voicebrainlive.ui.MemoryManagerActivity::class.java))
+                        },
+                        onQuickAutomate = {
+                            performHaptic()
+                            startActivity(Intent(context, AutomationActivity::class.java))
+                        },
+                        onStatusCardClick = {
+                            performHaptic()
+                            startActivity(Intent(context, SettingsActivity::class.java))
+                        },
+                        dashboardItems = listOf(
+                            DashboardItem("🔔", "သတိပေးချက်များ", R.drawable.ic_reminder) {
+                                performHaptic()
+                                startActivity(Intent(context, RemindersActivity::class.java))
+                            },
+                            DashboardItem("📝", "မှတ်စုနှင့် Notion", R.drawable.ic_notes) {
+                                performHaptic()
+                                startActivity(Intent(context, NotesActivity::class.java))
+                            },
+                            DashboardItem("👥", "အဆက်အသွယ်များ", R.drawable.ic_contacts) {
+                                performHaptic()
+                                startActivity(Intent(context, ContactsActivity::class.java))
+                            },
+                            DashboardItem("🕒", "ပြောဆိုမှတ်တမ်း", R.drawable.ic_history) {
+                                performHaptic()
+                                startActivity(Intent(context, HistoryActivity::class.java))
+                            }
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -243,28 +283,64 @@ class HomeFragment : Fragment() {
     private fun executeLocalText(text: String) {
         lifecycleScope.launch {
             val result = viewModel.executeLocalTextCommand(text)
+            viewModel.updateStatus(result)
             viewModel.onSpeakOfflineResponse(result)
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        hasGeminiKey = viewModel.hasUsableGeminiApiKey()
+    }
+
+    override fun onStop() {
+        stopOfflineVoice()
+        super.onStop()
+    }
+
+    private fun stopOfflineVoice() {
+        val recognizer = offlineRecognizer
+        offlineRecognizer = null
+        offlineListening = false
+        recognizer?.destroy()
+    }
+
     private fun startOfflineVoice() {
+        if (offlineRecognizer != null) return
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            offlineMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(requireContext())) {
-            Toast.makeText(context, getString(R.string.offline_stt_unavailable), Toast.LENGTH_SHORT).show()
+            viewModel.updateStatus(getString(R.string.offline_stt_unavailable))
             return
         }
         val recognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
+        offlineRecognizer = recognizer
+        offlineListening = true
+        viewModel.updateStatus("ဖုန်းအမိန့်ကို နားထောင်နေသည်")
         recognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {}
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onError(error: Int) {}
+            override fun onError(error: Int) {
+                if (offlineRecognizer !== recognizer) return
+                stopOfflineVoice()
+                viewModel.updateStatus("အသံအမိန့် မရရှိပါ။ ပြန်ပြောပါ သို့မဟုတ် စာရိုက်ပါ။")
+            }
             override fun onResults(results: Bundle?) {
+                if (offlineRecognizer !== recognizer) return
+                stopOfflineVoice()
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val text = matches?.firstOrNull() ?: ""
                 if (text.isNotBlank()) {
                     executeLocalText(text)
+                } else {
+                    viewModel.updateStatus("အသံအမိန့် မရရှိပါ။ ပြန်ပြောပါ သို့မဟုတ် စာရိုက်ပါ။")
                 }
             }
             override fun onPartialResults(partialResults: Bundle?) {}
@@ -274,6 +350,11 @@ class HomeFragment : Fragment() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "my-MM")
         }
-        recognizer.startListening(intent)
+        try {
+            recognizer.startListening(intent)
+        } catch (_: RuntimeException) {
+            stopOfflineVoice()
+            viewModel.updateStatus(getString(R.string.offline_stt_unavailable))
+        }
     }
 }

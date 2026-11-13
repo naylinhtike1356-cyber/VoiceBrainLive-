@@ -1,10 +1,18 @@
 <?xml version='1.0' encoding='utf-8'?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_gradient"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@drawable/bg_gradient">
+
+    <ScrollView
+        android:id="@+id/settingsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -248,7 +256,6 @@
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
-        <Button android:id="@+id/btnSave" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="8dp" android:layout_marginBottom="14dp" android:background="@drawable/bg_button_primary" android:text="Save Settings" android:textColor="@color/white" android:textSize="16sp" android:fontFamily="sans-serif-medium" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="🔒 Your API keys are stored securely on your device" android:textColor="@color/assistant_text_muted" android:textSize="12sp" android:layout_marginBottom="24dp" />
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnNativeAgent"
@@ -334,4 +341,17 @@
             app:cornerRadius="16dp"
             app:backgroundTint="@null" />
     </LinearLayout>
-</ScrollView>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnSave"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="52dp"
+        android:layout_marginHorizontal="18dp"
+        android:layout_marginVertical="8dp"
+        android:background="@drawable/bg_button_primary"
+        android:text="ဆက်တင်များ သိမ်းမည်"
+        android:textColor="@color/white"
+        android:textSize="16sp" />
+</LinearLayout>

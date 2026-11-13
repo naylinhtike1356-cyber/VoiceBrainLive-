@@ -209,7 +209,8 @@ class AppUpdateActivity : FragmentActivity() {
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    when (val provider = currentProvider) {
+                    val activeProvider = currentProvider
+                    when (val provider = (activeProvider as? FallbackReleaseProvider)?.selected ?: activeProvider) {
                         is HttpReleaseProvider -> {
                             provider.download(rel, targetApk) { downloaded, total ->
                                 updateDownloadProgress(downloaded, total)

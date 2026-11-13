@@ -37,9 +37,15 @@ class HistoryActivity : ComponentActivity() {
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnClearHistory.setOnClickListener {
-            VoiceHistory.clear(this)
-            loadHistory()
-            Toast.makeText(this, "မှတ်တမ်း ဖျက်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+            android.app.AlertDialog.Builder(this)
+                .setTitle("စကားပြောမှတ်တမ်း ဖျက်မလား")
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("ဖျက်မည်") { _, _ ->
+                    VoiceHistory.clear(this)
+                    loadHistory()
+                    Toast.makeText(this, "မှတ်တမ်း ဖျက်ပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+                }
+                .show()
         }
 
         binding.etHistorySearch.addTextChangedListener(object : TextWatcher {

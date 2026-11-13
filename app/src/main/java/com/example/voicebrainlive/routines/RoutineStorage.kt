@@ -198,15 +198,18 @@ object RoutineStorage {
 
     fun getAll(context: Context): List<RoutineItem> = load(context)
 
-    fun findVoiceRoutine(context: Context, input: String): RoutineItem? {
+    fun findVoiceRoutine(context: Context, input: String): RoutineItem? =
+        matchingVoiceRoutines(context, input).singleOrNull()
+
+    internal fun matchingVoiceRoutines(context: Context, input: String): List<RoutineItem> {
         val phrase = normalizeTrigger(input)
-        if (phrase.isBlank()) return null
+        if (phrase.isBlank()) return emptyList()
         val name = when {
             phrase.startsWith("run routine ") -> phrase.removePrefix("run routine ")
             phrase.startsWith("လုပ်ရိုးလုပ်စဉ် ") -> phrase.removePrefix("လုပ်ရိုးလုပ်စဉ် ")
             else -> null
         }
-        return getAll(context).singleOrNull { item ->
+        return getAll(context).filter { item ->
             item.enabled && (normalizeTrigger(item.triggerPhrase) == phrase ||
                 (name != null && normalizeTrigger(item.name) == name))
         }

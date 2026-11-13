@@ -106,7 +106,16 @@ class RoutineSpeakerService : Service() {
             .setAutoCancel(true)
             .build()
 
-        startForeground(ROUTINE_NOTIFICATION_ID, notification)
+        try {
+            startForeground(ROUTINE_NOTIFICATION_ID, notification)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Unable to start foreground routine playback", e)
+            if (scheduled && !isPre) {
+                AutomationExecutionLedger.record(this, id, AutomationExecutionLedger.Result.BLOCKED)
+            }
+            if (pendingRuns == 0) stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         pendingRuns++
         scope.launch {

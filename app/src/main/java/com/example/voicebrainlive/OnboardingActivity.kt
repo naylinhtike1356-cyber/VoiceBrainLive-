@@ -52,13 +52,17 @@ class OnboardingActivity : ComponentActivity() {
         }
 
         binding.btnNext.setOnClickListener {
-            if (currentStep < totalSteps - 1) {
-                goToStep(currentStep + 1)
-            }
+            if (currentStep == 0 && !SettingsActivity.hasUsableGeminiApiKey(this)) {
+                android.app.AlertDialog.Builder(this)
+                    .setMessage("Gemini အသုံးပြုရန် API Key ထည့်ပါ။ ဖုန်းအမိန့်များကို Key မပါဘဲ အသုံးပြုနိုင်ပါသည်။")
+                    .setPositiveButton("Key ထည့်မည်") { _, _ -> openGeminiSetup() }
+                    .setNegativeButton("ဆက်သွားမည်") { _, _ -> goToStep(1) }
+                    .show()
+            } else if (currentStep < totalSteps - 1) goToStep(currentStep + 1)
         }
 
         binding.btnStep1Settings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            openGeminiSetup()
         }
 
         binding.btnStep2Allow.setOnClickListener {
@@ -87,6 +91,8 @@ class OnboardingActivity : ComponentActivity() {
             finish()
         }
     }
+
+    private fun openGeminiSetup() = startActivity(SettingsActivity.geminiSetupIntent(this))
 
     private fun goToStep(step: Int) {
         if (step < 0 || step >= totalSteps) return

@@ -69,14 +69,11 @@ class ChatFragment : Fragment() {
 
     private fun loadMessages() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val allTurns = withContext(Dispatchers.IO) {
-                SimpleConversationStorage.getRecentForContext(
-                    context = requireContext(),
-                    limit = 100
-                )
+            val context = requireContext().applicationContext
+            val turns = withContext(Dispatchers.IO) {
+                SimpleConversationStorage.getSessionTurns(context, sessionId)
             }
-            val messages = allTurns
-                .filter { it.sessionId == sessionId }
+            val messages = turns
                 .map { turn ->
                     ChatMessage(
                         role = turn.role,
@@ -191,8 +188,26 @@ class ChatFragment : Fragment() {
     }
 
     private fun clearChat() {
-        chatAdapter.submitList(emptyList())
-        Toast.makeText(requireContext(), "အပြတ်အစီးကျေးဇူးတင်ပါသည်", Toast.LENGTH_SHORT).show()
+        if (sessionId.isBlank()) return
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("စကားပြောမှတ်တမ်း ဖျက်မလား")
+            .setMessage("ဒီ Chat ထဲမှာ သိမ်းထားတဲ့ စကားပြောမှတ်တမ်းကို ဖျက်ပါမယ်။")
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton("ဖျက်မည်") { _, _ ->
+                val context = requireContext().applicationContext
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        withContext(Dispatchers.IO) { SimpleConversationStorage.clearSession(context, sessionId) }
+                        chatAdapter.submitList(emptyList())
+                        Toast.makeText(context, "စကားပြောမှတ်တမ်း ဖျက်ပြီးပါပြီ။", Toast.LENGTH_SHORT).show()
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        Toast.makeText(context, "စကားပြောမှတ်တမ်း ဖျက်၍မရပါ။", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .show()
     }
 
     private fun copyToClipboard(content: String) {

@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
 import android.util.Log
 import java.security.KeyStore
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -40,6 +40,28 @@ class VoiceSecurityHelper(private val context: Context) {
         private const val GCM_TAG_LENGTH = 128
         private const val GCM_IV_LENGTH = 12
         private const val GCM_AAD = "VoiceBrainLive"
+        private const val AAD_PREFIX = "v2:"
+        private val keyLock = Any()
+
+        internal fun encrypt(plaintext: String, key: SecretKey): String {
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.ENCRYPT_MODE, key)
+            cipher.updateAAD(GCM_AAD.toByteArray(Charsets.UTF_8))
+            val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+            return AAD_PREFIX + Base64.getEncoder().encodeToString(cipher.iv + ciphertext)
+        }
+
+        internal fun decrypt(encryptedData: String, key: SecretKey): String {
+            val usesAad = encryptedData.startsWith(AAD_PREFIX)
+            val bytes = Base64.getDecoder().decode(encryptedData.removePrefix(AAD_PREFIX))
+            require(bytes.size >= GCM_IV_LENGTH + GCM_TAG_LENGTH / Byte.SIZE_BITS)
+            val spec = GCMParameterSpec(GCM_TAG_LENGTH, bytes, 0, GCM_IV_LENGTH)
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.DECRYPT_MODE, key, spec)
+            // The original writer authenticated the ciphertext without associated data.
+            if (usesAad) cipher.updateAAD(GCM_AAD.toByteArray(Charsets.UTF_8))
+            return String(cipher.doFinal(bytes, GCM_IV_LENGTH, bytes.size - GCM_IV_LENGTH), Charsets.UTF_8)
+        }
     }
 
     init {
@@ -50,8 +72,8 @@ class VoiceSecurityHelper(private val context: Context) {
      * Key ရှိမရှိ စစ်ဆေးပြီး မရှိရင် ဖန်တီးသည်
      */
     private fun ensureKeyExists() {
-        if (!keyStore.containsAlias(KEY_ALIAS)) {
-            generateKey()
+        synchronized(keyLock) {
+            if (!keyStore.containsAlias(KEY_ALIAS)) generateKey()
         }
     }
 
@@ -95,19 +117,11 @@ class VoiceSecurityHelper(private val context: Context) {
      * Voice data ကို encrypt လုပ်ခြင်း
      * 
      * @param plaintext ရိုက်ထည့်ထားသော voice data
-     * @return Base64 encoded encrypted data (IV + ciphertext + tag)
+     * @return Version prefix followed by Base64 encoded IV, ciphertext and tag
      */
     fun encryptVoiceData(plaintext: String): String {
         return try {
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, getSecretKey())
-            
-            val iv = cipher.iv // GCM IV is generated automatically
-            val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
-            
-            // Combine IV + ciphertext for storage
-            val combined = iv + ciphertext
-            Base64.encodeToString(combined, Base64.NO_WRAP)
+            encrypt(plaintext, getSecretKey())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to encrypt voice data", e)
             ""
@@ -122,19 +136,7 @@ class VoiceSecurityHelper(private val context: Context) {
      */
     fun decryptVoiceData(encryptedData: String): String {
         return try {
-            val combined = Base64.decode(encryptedData, Base64.NO_WRAP)
-            
-            // Extract IV (first 12 bytes) and ciphertext
-            val iv = combined.sliceArray(0 until GCM_IV_LENGTH)
-            val ciphertext = combined.sliceArray(GCM_IV_LENGTH until combined.size)
-            
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
-            cipher.init(Cipher.DECRYPT_MODE, getSecretKey(), spec)
-            cipher.updateAAD(GCM_AAD.toByteArray(Charsets.UTF_8))
-            
-            val plaintext = cipher.doFinal(ciphertext)
-            String(plaintext, Charsets.UTF_8)
+            decrypt(encryptedData, getSecretKey())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decrypt voice data", e)
             ""

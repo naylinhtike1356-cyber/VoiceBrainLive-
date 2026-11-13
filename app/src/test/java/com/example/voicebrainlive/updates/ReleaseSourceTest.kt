@@ -6,6 +6,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReleaseSourceTest {
+    @Test fun onlyDedicatedProductionFeedUsesGitHubFallback() {
+        assertTrue(ReleaseSource.provider("com.example.voicebrainlive", "https://voicebrainlive.vercel.app/") is FallbackReleaseProvider)
+        assertTrue(ReleaseSource.provider("com.example.voicebrainlive", "https://voicebrain.example") is HttpReleaseProvider)
+    }
+
+    @Test fun brokenProductionFeedSelectsFallbackProvider() = runBlocking {
+        val primary = object : ReleaseProvider {
+            override val configured = true
+            override suspend fun latest(): ReleaseManifest? = throw java.io.IOException("unavailable")
+        }
+        val fallback = object : ReleaseProvider {
+            override val configured = true
+            override suspend fun latest(): ReleaseManifest? = null
+        }
+        val provider = FallbackReleaseProvider(primary, fallback)
+        provider.latest()
+        assertSame(fallback, provider.selected)
+    }
     @Test fun rejectsMissingMalformedAndReservedOrigins() {
         listOf("", "https://", "http://voicebrain.example", "https://user@voicebrain.example",
             "https://voicebrain.example/feed", "https://voicebrain.example?x=1",

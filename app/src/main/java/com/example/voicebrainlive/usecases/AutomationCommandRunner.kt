@@ -22,6 +22,30 @@ import com.example.voicebrainlive.weather.WeatherNarrative
  */
 class AutomationCommandRunner(private val context: Context) {
 
+    suspend fun runVoiceRoutine(input: String): String? {
+        val matches = RoutineStorage.matchingVoiceRoutines(context, input)
+        if (matches.size > 1) {
+            return "BLOCKED: ဒီစကားစုနဲ့ Routine တစ်ခုထက်ပို ကိုက်ညီနေပါတယ်။ Routine အမည်ကို ပြောပါ။"
+        }
+        matches.singleOrNull()?.let { return run(it) }
+        return when (val command = OfflineCommandMatcher.matchDirectAction(input)?.first) {
+            "work_mode", "bedtime_mode" -> runQuickMode(command)
+            else -> null
+        }
+    }
+
+    suspend fun runQuickMode(command: String): String = when (command) {
+        "work_mode" -> run(
+            type = "work", message = "အလုပ်ခွင်", musicQuery = "ပျော်ရွှင်စေမည့်သီချင်း",
+            ringerMode = "silent", volumePercent = 50
+        )
+        "bedtime_mode" -> run(
+            type = "bedtime", message = "အိပ်ရာဝင်ချိန်", musicQuery = "အိပ်ရာဝင်သီချင်း",
+            ringerMode = "silent", volumePercent = 20, sleepTimerMinutes = 30
+        )
+        else -> "BLOCKED: Unknown mode"
+    }
+
     private val executor by lazy { PhoneCommandExecutor(context) }
     private val verification by lazy { MacroDeviceVerification(context) }
 
