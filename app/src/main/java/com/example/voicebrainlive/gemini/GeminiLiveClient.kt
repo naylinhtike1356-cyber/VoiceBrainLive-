@@ -31,7 +31,7 @@ class GeminiLiveClient(
     private val systemInstructionExtra: String = "",
     private val automationContext: android.content.Context? = null,
     private val onExecutePhoneCommand: suspend (commandType: String, target: String?, value: String?) -> String = { _, _, _ -> "Not implemented" }
-) {
+) : LiveVoiceProvider {
     
     fun getApiKey(): String = apiKey
 
@@ -83,25 +83,25 @@ class GeminiLiveClient(
         }
     }
 
-    var onConnected: (() -> Unit)? = null
-    var onSetupComplete: (() -> Unit)? = null
+    override var onConnected: (() -> Unit)? = null
+    override var onSetupComplete: (() -> Unit)? = null
     /** Invoked when initial user turn (e.g. မင်္ဂလာပါ) is sent - for Conversation Log. */
-    var onInitialUserTurnSent: ((text: String) -> Unit)? = null
-    var onDisconnected: ((String) -> Unit)? = null
-    var onAudioChunk: ((base64Audio: String) -> Unit)? = null
-    var onAudioBytes: ((bytes: ByteArray) -> Unit)? = null
-    var onTranscript: ((text: String) -> Unit)? = null
+    override var onInitialUserTurnSent: ((text: String) -> Unit)? = null
+    override var onDisconnected: ((String) -> Unit)? = null
+    override var onAudioChunk: ((base64Audio: String) -> Unit)? = null
+    override var onAudioBytes: ((bytes: ByteArray) -> Unit)? = null
+    override var onTranscript: ((text: String) -> Unit)? = null
     /** Local agent display only; never append to provider transcript/history/summary. */
-    var onAgentTranscript: ((text: String, current: () -> Boolean) -> Unit)? = null
-    var onInputTranscript: ((text: String) -> Unit)? = null
-    var onOutputTranscript: ((text: String) -> Unit)? = null
-    var onTurnComplete: (() -> Unit)? = null
-    var onTaskStarted: (() -> Unit)? = null
-    var onInterrupted: (() -> Unit)? = null
-    var onError: ((String) -> Unit)? = null
-    var onLog: ((String) -> Unit)? = null
-    var onSetupSuccess: ((String) -> Unit)? = null
-    var onReconnecting: ((attempt: Int, delayMs: Long) -> Unit)? = null
+    override var onAgentTranscript: ((text: String, current: () -> Boolean) -> Unit)? = null
+    override var onInputTranscript: ((text: String) -> Unit)? = null
+    override var onOutputTranscript: ((text: String) -> Unit)? = null
+    override var onTurnComplete: (() -> Unit)? = null
+    override var onTaskStarted: (() -> Unit)? = null
+    override var onInterrupted: (() -> Unit)? = null
+    override var onError: ((String) -> Unit)? = null
+    override var onLog: ((String) -> Unit)? = null
+    override var onSetupSuccess: ((String) -> Unit)? = null
+    override var onReconnecting: ((attempt: Int, delayMs: Long) -> Unit)? = null
 
     private var reconnectAttempt = 0
     private var isReconnecting = false
@@ -109,7 +109,7 @@ class GeminiLiveClient(
 
     private val wsUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=$apiKey"
 
-    fun connect() = connectInternal(scope.coroutineContext[Job], manual = true)
+    override fun connect() = connectInternal(scope.coroutineContext[Job], manual = true)
 
     private fun connectInternal(parent: Job?, manual: Boolean) {
         synchronized(connectionEpoch) {
@@ -558,7 +558,7 @@ class GeminiLiveClient(
     }
 
     /** Compatibility entry point: only the tracked per-session tool worker may deliver results. */
-    fun sendToolResponse(callId: String, functionName: String, result: String) {
+    override fun sendToolResponse(callId: String, functionName: String, result: String) {
         onError?.invoke("Untracked tool response was rejected.")
     }
 
@@ -586,7 +586,7 @@ class GeminiLiveClient(
      * Send text input (typed command) - same logic as voice. Works when connected after setup.
      * If not yet ready, queues and sends when setup completes.
      */
-    fun sendTextInput(text: String) {
+    override fun sendTextInput(text: String) {
         val t = text
         if (t.isBlank()) return
         if (narrationOnly) {
@@ -613,7 +613,7 @@ class GeminiLiveClient(
     }
 
     /** Direct user UI entry only. Internal/proactive text and model tools cannot invoke local review. */
-    fun sendConversationInput(text: String) {
+    override fun sendConversationInput(text: String) {
         if (!text.startsWith("/agent")) {
             conversationAgent?.second?.interrupt()
             synchronized(connectionEpoch) { explicitAgentGoal = null }
@@ -706,7 +706,7 @@ class GeminiLiveClient(
         }
     }
 
-    fun sendAudioChunk(base64Audio: String) {
+    override fun sendAudioChunk(base64Audio: String) {
         val ws = webSocket ?: return
         try {
             val realtimeInput = JSONObject().apply {
@@ -729,7 +729,7 @@ class GeminiLiveClient(
      * Phase 3.1: Vision - Send image frame to Gemini.
      * @param base64Image Base64 encoded JPEG image data.
      */
-    fun sendImageFrame(base64Image: String) {
+    override fun sendImageFrame(base64Image: String) {
         onError?.invoke("BLOCKED: Image sharing requires explicit consent for the reviewed frame.")
     }
 
@@ -1042,7 +1042,7 @@ class GeminiLiveClient(
     /** Set to true when user explicitly disconnects; used to skip auto-retry. */
     var userInitiatedDisconnect = false
 
-    fun disconnect() {
+    override fun disconnect() {
         sleepVoiceInput = null
         synchronized(connectionEpoch) {
         connectionEpoch.close()
@@ -1060,7 +1060,7 @@ class GeminiLiveClient(
         }
     }
 
-    fun isConnected(): Boolean = webSocket != null
+    override fun isConnected(): Boolean = webSocket != null
 
     private fun hasUsableApiKey(): Boolean {
         val trimmed = apiKey.trim()

@@ -1,27 +1,22 @@
 package com.example.voicebrainlive
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import com.example.voicebrainlive.databinding.ActivityGuideBinding
+import androidx.activity.compose.setContent
+import com.example.voicebrainlive.ui.components.GuideScreen
+import com.example.voicebrainlive.ui.theme.VoiceBrainLiveTheme
 
 /**
- * အသုံးပြုလမ်းညွန် – Voice Brain အသုံးပြုနည်း၊ အသံကွန်းမက်များ၊ အပ်ဒိတ်အစီအစဉ်
+ * အသုံးပြုလမ်းညွှန် – Voice Brain အသုံးပြုနည်း၊ အသံကွန်းမက်များ၊ Backup နှင့် Update
  */
 class GuideActivity : ComponentActivity() {
-
-    private lateinit var binding: ActivityGuideBinding
-
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeUtils.applyTheme(this)
         super.onCreate(savedInstanceState)
-        binding = ActivityGuideBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        if (ThemeUtils.getTheme(this) == "light") {
-            binding.root.setBackgroundResource(R.drawable.bg_gradient_light)
+        setContent {
+            VoiceBrainLiveTheme(darkTheme = ThemeUtils.getTheme(this) != "light", dynamicColor = false) {
+                GuideScreen(onBack = { finish() })
+            }
         }
-
-        binding.btnBack.setOnClickListener { finish() }
     }
 }

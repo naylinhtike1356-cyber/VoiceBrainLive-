@@ -26,7 +26,7 @@ object MediaSessionHelper {
     private var listenerComponent: ComponentName? = null
 
     fun onListenerConnected(context: Context) {
-        listenerComponent = ComponentName(context, MediaSessionAccessService::class.java)
+        listenerComponent = ComponentName(context, com.example.voicebrainlive.messenger.UnifiedNotificationListenerService::class.java)
         Log.d(TAG, "NotificationListener connected - can use MediaController")
     }
 
@@ -41,7 +41,7 @@ object MediaSessionHelper {
             context.contentResolver,
             "enabled_notification_listeners"
         ) ?: return false
-        val ourComponent = ComponentName(context, MediaSessionAccessService::class.java).flattenToString()
+        val ourComponent = ComponentName(context, com.example.voicebrainlive.messenger.UnifiedNotificationListenerService::class.java).flattenToString()
         return enabled.contains(ourComponent)
     }
 

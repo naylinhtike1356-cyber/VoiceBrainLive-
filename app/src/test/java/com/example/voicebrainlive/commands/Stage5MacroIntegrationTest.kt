@@ -96,19 +96,6 @@ class Stage5MacroIntegrationTest {
         assertFalse(macros.contains("suffix"))
     }
 
-    @Test fun unconfiguredSmartHomeCommandsAreHandledWithoutFalseSuccessOrNativeEffects() = runBlocking {
-        val registry = ToolRegistryImpl(app, app.getSharedPreferences("quick_contacts", Context.MODE_PRIVATE))
-        val aliases = listOf("turn_on_light", "light_on", "turn_off_light", "light_off", "set_temperature", "thermostat",
-            "smart_home_scene", "scene", "toggle_light", "dim_light", "set_ac", "turn_off_all_lights", "smart_home")
-        for (alias in aliases) {
-            val result = registry.executeCommandAsync(alias, "PRIVATE_TARGET", "PRIVATE_ACTION")
-            assertNotNull(result)
-            assertTrue(result!!, result.startsWith("NOT_CONFIGURED:"))
-            assertFalse(result.contains("PRIVATE_TARGET")); assertFalse(result.contains("PRIVATE_ACTION"))
-        }
-        assertNull(shadowOf(app).nextStartedActivity)
-    }
-
     @Test fun learnedMacroUnverifiedResultDoesNotReinforcePatternOrSpeakSuccessHint() = runBlocking {
         macros.edit().putString("root", "get_time").commit()
         val phrase = "review bounded macro"
@@ -122,21 +109,6 @@ class Stage5MacroIntegrationTest {
         assertTrue(result!!.resultMessage, result.resultMessage.startsWith("UNVERIFIED:"))
         assertEquals(result.resultMessage, result.spokenHint)
         assertEquals(before, learner.getIntentForPhrase(app, phrase))
-    }
-
-    @Test fun learnedUnconfiguredDeviceResultDoesNotReinforcePatternOrSpeakSuccessHint() = runBlocking {
-        val phrase = "review home light"
-        val learner = com.example.voicebrainlive.learning.IntentPatternLearner
-        learner.clearPatterns(app)
-        learner.recordPattern(app, phrase, "turn_on_light", "synthetic-room", confirmedByUser = true)
-        learner.confirmPattern(app, phrase)
-        val before = learner.getIntentForPhrase(app, phrase)
-        val result = com.example.voicebrainlive.learning.LearnedIntentExecutor.tryExecute(app, phrase, executor)
-        assertNotNull(result)
-        assertTrue(result!!.resultMessage, result.resultMessage.startsWith("NOT_CONFIGURED:"))
-        assertEquals(result.resultMessage, result.spokenHint)
-        assertEquals(before, learner.getIntentForPhrase(app, phrase))
-        assertNull(shadowOf(app).nextStartedActivity)
     }
 
     @Test fun scheduledSequenceStopsAfterOpaqueReadBeforeLocalWriteSuffix() = runBlocking {

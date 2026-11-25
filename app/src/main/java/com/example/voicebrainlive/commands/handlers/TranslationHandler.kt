@@ -11,9 +11,6 @@ class TranslationHandler(context: Context) : CommandHandler {
         when (commandType.lowercase()) {
             "translate" -> voiceBrainExtensions.translateText(target ?: "", value ?: "english")
             "translate_from" -> voiceBrainExtensions.translateFrom(target ?: "auto", value ?: "")
-            "start_call_recording" -> voiceBrainExtensions.startCallRecording()
-            "stop_call_recording" -> voiceBrainExtensions.stopCallRecording()
-            "transcribe_call" -> voiceBrainExtensions.transcribeCall()
             "live_translate_call", "live_translate" -> voiceBrainExtensions.liveTranslate(target ?: "myanmar", value ?: "english")
             "detect_language" -> voiceBrainExtensions.detectLanguage(target ?: "")
             "supported_languages" -> voiceBrainExtensions.getSupportedLanguages()
@@ -24,9 +21,6 @@ class TranslationHandler(context: Context) : CommandHandler {
     override fun getSupportedCommands(): List<String> = listOf(
         "translate",
         "translate_from",
-        "start_call_recording",
-        "stop_call_recording",
-        "transcribe_call",
         "live_translate_call",
         "live_translate",
         "detect_language",

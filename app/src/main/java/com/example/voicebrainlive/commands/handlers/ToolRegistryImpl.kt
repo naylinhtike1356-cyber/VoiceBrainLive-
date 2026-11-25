@@ -22,11 +22,11 @@ class ToolRegistryImpl(
     private val gemHandler = GemHandler(context)
     private val automationHandler = AutomationHandler(context)
     private val visionHandler = VisionHandler(context)
-    private val smartHomeCommands = SmartHomeCommands(context)
-    private val smartHomeHandler = SmartHomeHandler(context)
+
+
     private val translationHandler = TranslationHandler(context)
-    private val creativeHandler = CreativeHandler(context)
-    private val salaryHandler = SalaryHandler(context)
+
+
     private val locationHandler = LocationHandler(context)
     private val calendarHandler = CalendarHandler(context)
     private val accessibilityHandler = AccessibilityHandler(context)
@@ -40,13 +40,13 @@ class ToolRegistryImpl(
         gemHandler,
         automationHandler,
         visionHandler,
-        smartHomeCommands,
-        smartHomeHandler,
+
+
         locationHandler,
         calendarHandler,
         translationHandler,
-        creativeHandler,
-        salaryHandler,
+
+
         accessibilityHandler
     )
 
@@ -212,7 +212,7 @@ class ToolRegistryImpl(
             spec("switch_gem", description = "Switch active gem persona")
             spec("get_relevant_memory", description = "Semantic memory search")
             spec("run_routine", description = "Run a named morning/evening routine")
-            spec("smart_home", description = "Control smart home device")
+
             spec("set_home_location", setOf(android.Manifest.permission.ACCESS_FINE_LOCATION), "Save home geofence")
             spec("set_office_location", setOf(android.Manifest.permission.ACCESS_FINE_LOCATION), "Save office geofence")
             spec("set_office_wifi", description = "Save office WiFi SSID trigger")

@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
  * Uses local logic for time, date, math, greetings, help. Not the on-device Gemini Nano model.
  * Named "GeminiNanoHelper" for compatibility; consider renaming to OfflineAIHelper.
  */
-class GeminiNanoHelper(private val context: Context) {
+class GeminiNanoHelper(private val context: Context) : OfflineAssistantEngine {
 
     companion object {
         const val TAG = "OfflineAI"
@@ -21,18 +21,18 @@ class GeminiNanoHelper(private val context: Context) {
     
     private var isInitialized = false
     
-    suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         isInitialized = true
         Log.d(TAG, "Offline AI initialized")
         true
     }
     
-    fun isReady(): Boolean = isInitialized
+    override fun isReady(): Boolean = isInitialized
     
     /**
      * Generate response for offline queries
      */
-    suspend fun generateResponse(prompt: String): String = withContext(Dispatchers.IO) {
+    override suspend fun generateResponse(prompt: String): String = withContext(Dispatchers.IO) {
         getOfflineResponse(prompt)
     }
     

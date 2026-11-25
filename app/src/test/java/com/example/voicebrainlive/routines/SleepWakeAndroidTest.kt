@@ -76,7 +76,7 @@ class SleepWakeAndroidTest {
         assertTrue(Shadows.shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications.isEmpty())
     }
     @Test fun inaccessibleNotificationListenerFallsBackToMediaKeyInsteadOfPretendingPause()=runBlocking<Unit>{
-        val c=ComponentName(app,com.example.voicebrainlive.MediaSessionAccessService::class.java).flattenToString()
+        val c=ComponentName(app,com.example.voicebrainlive.messenger.UnifiedNotificationListenerService::class.java).flattenToString()
         Settings.Secure.putString(app.contentResolver,"enabled_notification_listeners",c)
         com.example.voicebrainlive.MediaSessionHelper.onListenerDisconnected()
         assertEquals(MusicCommands.PAUSE_REQUESTED,execute("media_pause"))

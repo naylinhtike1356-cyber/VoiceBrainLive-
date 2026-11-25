@@ -58,12 +58,14 @@ open class UnifiedNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
-        Log.d(TAG, "UnifiedNotificationListener connected — SMS, Health, Weather & Apps ready")
+        com.example.voicebrainlive.MediaSessionHelper.onListenerConnected(this)
+        Log.d(TAG, "UnifiedNotificationListener connected — SMS, Health, Weather, Media & Apps ready")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         instance = null
+        com.example.voicebrainlive.MediaSessionHelper.onListenerDisconnected()
         Log.d(TAG, "UnifiedNotificationListener disconnected")
     }
 

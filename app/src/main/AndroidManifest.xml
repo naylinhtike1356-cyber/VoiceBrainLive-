@@ -71,7 +71,7 @@
             <data android:mimeType="text/plain" />
         </intent>
         <package android:name="com.google.android.apps.healthdata" />
-        <provider android:authorities="com.example.salarytracker.voiceprovider" />
+
         <!-- Messenger / WhatsApp - send_messenger, send_whatsapp -->
         <package android:name="com.facebook.orca" />
         <package android:name="com.whatsapp" />
@@ -269,16 +269,7 @@
                 android:resource="@xml/recognition_service" />
         </service>
 
-        <!-- Media Session: reliable Spotify/YT Music play via MediaController (Settings → Notification access) -->
-        <service
-            android:name=".MediaSessionAccessService"
-            android:exported="true"
-            android:label="Voice Brain - Media Control"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+        <!-- Media Session & Notification Engine consolidated into UnifiedNotificationListenerService -->
 
         <!-- Wake Word: Hey Voice / Voice Brain ပြောပြီး နှိုးမယ် -->
         <service
@@ -333,14 +324,7 @@
                 <action android:name="com.example.voicebrainlive.CAL_EVENT_REMINDER" />
             </intent-filter>
         </receiver>
-        <service
-            android:name=".calendar.CalendarReminderSpeakerService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <meta-data
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Calendar event reminder TTS" />
-        </service>
+
 
         <!-- Phase 2.1: Geofencing – Home/Office GPS ရောက်တဲ့အခါ trigger -->
         <receiver
@@ -348,14 +332,7 @@
             android:exported="false" />
 
         <!-- Event-Driven: Office WiFi ရောက်တဲ့အခါ ခုပဲ ရောက်တာလား -->
-        <service
-            android:name=".location.LocationArrivalSpeakerService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <meta-data
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Office arrival TTS" />
-        </service>
+
 
         <!-- Proactive "မိုးရွာမယ်" – မနက် ၇ နာရီမှာ မိုးရွာမယ့် အခြေအနေ သတိပေး -->
         <receiver
@@ -376,14 +353,7 @@
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
             </intent-filter>
         </receiver>
-        <service
-            android:name=".proactive.ProactiveRainService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <meta-data
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Proactive rain alert check" />
-        </service>
+
 
 
 
@@ -444,21 +414,7 @@
             </intent-filter>
         </receiver>
         
-        <!-- v2.0 Call Recording Service -->
-        <service
-            android:name=".CallRecordingService"
-            android:exported="false"
-            android:foregroundServiceType="phoneCall" />
-        
-        <!-- v2.0 Call State Receiver -->
-        <receiver
-            android:name=".CallStateReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.PHONE_STATE" />
-                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
-            </intent-filter>
-        </receiver>
+
 
         <receiver
             android:name=".VoiceBrainWidget"
@@ -483,15 +439,7 @@
             </intent-filter>
         </service>
 
-        <!-- Messenger/WhatsApp Notification Reply - RemoteInput ဖြင့် တိုက်ရိုက်ပို့နိုင် -->
-        <service
-            android:name=".messenger.MessengerNotificationReplyService"
-            android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+
 
         <!-- v3.0: Accessibility Voice Access Service -->
         <service

@@ -221,6 +221,12 @@ object RoutineStorage {
             .replace(Regex("\\s+"), " ")
 
     @Synchronized
+    fun clearAll(context: Context) {
+        AtomicFile(getFile(context)).delete()
+        Log.d("RoutineStorage", "clearAll")
+    }
+
+    @Synchronized
     fun delete(context: Context, id: Int) {
         val items = load(context).filter { it.id != id }
         save(context, items)

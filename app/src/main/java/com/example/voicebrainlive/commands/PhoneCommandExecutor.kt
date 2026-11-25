@@ -39,7 +39,6 @@ import com.example.voicebrainlive.LastResponseStore
 import com.example.voicebrainlive.MeetingNotesHelper
 import com.example.voicebrainlive.ReminderHelper
 import com.example.voicebrainlive.ReminderReceiver
-import com.example.voicebrainlive.SalaryDataReader
 import com.example.voicebrainlive.SettingsActivity
 import com.example.voicebrainlive.UserPreferences
 import com.example.voicebrainlive.MediaSessionHelper
@@ -63,7 +62,6 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.Tasks
 import com.example.voicebrainlive.messenger.MessengerApiClient
-import com.example.voicebrainlive.messenger.MessengerNotificationReplyService
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -256,11 +254,6 @@ class PhoneCommandExecutor(private val context: Context) {
                 "save_preference" -> savePreference(target ?: "", value ?: "")
                 "set_focus_mode" -> setFocusMode(value?.toIntOrNull() ?: 30)
                 "end_focus_mode" -> endFocusMode()
-                
-                // SalaryTracker Integration
-                "get_salary_data", "query_salary" -> SalaryDataReader.getSalaryAnswer(context, target ?: value ?: "")
-                "add_salary_today", "quick_add_salary" -> SalaryDataReader.insertSalaryAction(context, "quick_add_today")
-                "copy_salary_yesterday" -> SalaryDataReader.insertSalaryAction(context, "copy_yesterday")
                 
                 // v2.0 Calendar Integration
                 "schedule_today", "my_schedule" -> getScheduleToday()

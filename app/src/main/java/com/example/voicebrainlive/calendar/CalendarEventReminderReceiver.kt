@@ -3,18 +3,17 @@ package com.example.voicebrainlive.calendar
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.PowerManager
+import com.example.voicebrainlive.proactive.ProactiveAlertDispatcher
 
 /**
- * Event-Driven: Meeting မစခင် ၁၅ မိနစ်အလို alarm ဖြစ်ရင် CalendarReminderSpeakerService စတင်
+ * Event-Driven: Meeting မစခင် ၁၅ မိနစ်အလို alarm ဖြစ်ရင် Calendar reminder alert ပို့ပေးခြင်း
  */
 class CalendarEventReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_CAL_REMINDER) return
 
-        val eventId = intent.getLongExtra(EXTRA_EVENT_ID, -1L)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Meeting"
 
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -25,15 +24,7 @@ class CalendarEventReminderReceiver : BroadcastReceiver() {
         wakeLock.acquire(30_000L)
 
         try {
-            val serviceIntent = Intent(context, CalendarReminderSpeakerService::class.java).apply {
-                putExtra(EXTRA_EVENT_ID, eventId)
-                putExtra(EXTRA_TITLE, title)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
+            ProactiveAlertDispatcher.dispatchCalendarReminder(context, title)
         } finally {
             if (wakeLock.isHeld) wakeLock.release()
         }

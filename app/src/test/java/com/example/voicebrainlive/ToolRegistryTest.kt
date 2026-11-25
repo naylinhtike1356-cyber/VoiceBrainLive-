@@ -53,13 +53,6 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun smart_home_isHandled() {
-        val result = registry.executeCommand("smart_home", "light", "on")
-        assertNotNull(result)
-        assertFalse(result!!.startsWith("Unknown command"))
-    }
-
-    @Test
     fun set_home_location_withoutGps_returnsPermissionOrLocationMessage() {
         val result = registry.executeCommand("set_home_location", null, null)
         assertNotNull(result)

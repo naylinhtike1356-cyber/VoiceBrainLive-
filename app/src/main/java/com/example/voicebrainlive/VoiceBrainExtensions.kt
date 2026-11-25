@@ -114,30 +114,8 @@ class VoiceBrainExtensions(private val context: Context) {
             return "Already recording"
         }
         
-        // Check permissions
-        val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        
-        try {
-            // Register call state receiver
-            CallStateReceiver.onCallStateChanged = { state, number ->
-                when (state) {
-                    "OFFHOOK" -> {
-                        // Call answered - start recording
-                        startRecordingService()
-                    }
-                    "IDLE" -> {
-                        // Call ended - stop recording
-                        stopRecordingService()
-                    }
-                }
-            }
-            
-            isRecordingCall = true
-            return "Call recording enabled. I'll record your next phone call automatically."
-        } catch (e: Exception) {
-            Log.e(TAG, "Call recording error: ${e.message}")
-            return "Could not enable call recording: ${e.message}"
-        }
+        // Call recording removed: Android 10+ restricts non-system call recording.
+        return "Call recording is not supported on modern Android."
     }
     
     fun stopCallRecording(): String {
@@ -146,28 +124,8 @@ class VoiceBrainExtensions(private val context: Context) {
         return "Call recording disabled"
     }
     
-    private fun startRecordingService() {
-        try {
-            val intent = Intent(context, CallRecordingService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-            Log.d(TAG, "Recording service started")
-        } catch (e: Exception) {
-            Log.e(TAG, "Could not start recording: ${e.message}")
-        }
-    }
-    
-    private fun stopRecordingService() {
-        try {
-            context.stopService(Intent(context, CallRecordingService::class.java))
-            Log.d(TAG, "Recording service stopped")
-        } catch (e: Exception) {
-            Log.e(TAG, "Could not stop recording: ${e.message}")
-        }
-    }
+    private fun startRecordingService() { }
+    private fun stopRecordingService() { }
     
     // ===== TRANSCRIBE CALL =====
     
@@ -192,19 +150,7 @@ class VoiceBrainExtensions(private val context: Context) {
         
         isLiveTranslating = true
         
-        // Register call state receiver for live translation
-        CallStateReceiver.onCallStateChanged = { state, number ->
-            when (state) {
-                "OFFHOOK" -> {
-                    // Start live translation
-                    startLiveTranslationMode(sourceLang, targetLang)
-                }
-                "IDLE" -> {
-                    // Stop live translation
-                    isLiveTranslating = false
-                }
-            }
-        }
+        startLiveTranslationMode(sourceLang, targetLang)
         
         val sourceName = translationHelper!!.getLanguageName(
             translationHelper!!.getLanguageCode(sourceLang)

@@ -4,7 +4,7 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.media.session.MediaSessionManager
 import android.os.Build
-import com.example.voicebrainlive.MediaSessionAccessService
+import com.example.voicebrainlive.messenger.UnifiedNotificationListenerService
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,7 +35,7 @@ internal object ReviewedAppTarget {
                 }
                 "resume_music"->{
                     val manager=context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager?:return@withContext "BLOCKED:MEDIA_UNAVAILABLE"
-                    val controllers=manager.getActiveSessions(ComponentName(context,MediaSessionAccessService::class.java)).filter{it.packageName==exact}
+                    val controllers=manager.getActiveSessions(ComponentName(context,UnifiedNotificationListenerService::class.java)).filter{it.packageName==exact}
                     if(controllers.size!=1)return@withContext "BLOCKED:EXACT_MEDIA_SESSION_REQUIRED"
                     controllers.single().transportControls.play()
                     "SUBMITTED:MEDIA_PLAY" // delivery of a command, not evidence of audible playback

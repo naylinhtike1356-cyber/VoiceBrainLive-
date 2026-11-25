@@ -2,7 +2,6 @@ package com.example.voicebrainlive.usecases
 
 import android.content.Context
 import com.example.voicebrainlive.OfflineCommandMatcher
-import com.example.voicebrainlive.SalaryDataReader
 import com.example.voicebrainlive.commands.PhoneCommandExecutor
 import com.example.voicebrainlive.commands.AutomationCommandValidator
 import com.example.voicebrainlive.commands.BoundedMacroRunner
@@ -151,14 +150,6 @@ class AutomationCommandRunner(private val context: Context) {
                         CommandSafetyPolicy.classify(match.first) != CommandSafetyPolicy.Classification.SAFE ->
                             "BLOCKED: ဒီသတိပေးချက်က လုပ်ဆောင်ရန် အတည်ပြုချက်လိုပါသည်။"
                         else -> formatResult(executor.executeAsync(match.first, match.second, match.third))
-                    }
-                }
-                "daily_log" -> {
-                    val res = SalaryDataReader.getSalaryAnswer(context, "today")
-                    if (res.contains("မရှိသေးပါ") || res.contains("မရှိပါ")) {
-                        "ယနေ့ လစာမှတ်တမ်း မရှိသေးပါ။ မှတ်တမ်းတင်ပေးပါ။"
-                    } else {
-                        res
                     }
                 }
                 else -> {

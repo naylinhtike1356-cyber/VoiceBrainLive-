@@ -3,8 +3,8 @@ package com.example.voicebrainlive.location
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
+import com.example.voicebrainlive.proactive.ProactiveAlertDispatcher
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofenceStatusCodes
 import com.google.android.gms.location.GeofencingEvent
@@ -26,25 +26,20 @@ class GeofenceReceiver : BroadcastReceiver() {
 
         val isEnter = transition == Geofence.GEOFENCE_TRANSITION_ENTER
         for (gf in event.triggeringGeofences ?: emptyList()) {
-            val requestId = gf.requestId
-            when (requestId) {
+            when (gf.requestId) {
                 GEOFENCE_ID_HOME -> {
                     if (!LocationTriggerStorage.shouldTriggerGeofence(context, "home")) continue
                     LocationTriggerStorage.markGeofenceTriggered(context, "home")
                     if (isEnter) {
                         Log.d(TAG, "Home geofence entered")
-                        val serviceIntent = Intent(context, LocationArrivalSpeakerService::class.java).apply {
-                            putExtra(LocationArrivalSpeakerService.EXTRA_MESSAGE, "အိမ်ရောက်ပြီ")
-                            putExtra(LocationArrivalSpeakerService.EXTRA_ACTION, LocationArrivalSpeakerService.ACTION_HOME)
-                        }
-                        startService(context, serviceIntent)
+                        ProactiveAlertDispatcher.dispatchLocationArrival(
+                            context, "အိမ်ရောက်ပြီ", ProactiveAlertDispatcher.ACTION_HOME
+                        )
                     } else {
                         Log.d(TAG, "Home geofence exited")
-                        val serviceIntent = Intent(context, LocationArrivalSpeakerService::class.java).apply {
-                            putExtra(LocationArrivalSpeakerService.EXTRA_MESSAGE, "အိမ်ကနေ ထွက်သွားပြီ")
-                            putExtra(LocationArrivalSpeakerService.EXTRA_ACTION, LocationArrivalSpeakerService.ACTION_HOME_EXIT)
-                        }
-                        startService(context, serviceIntent)
+                        ProactiveAlertDispatcher.dispatchLocationArrival(
+                            context, "အိမ်ကနေ ထွက်သွားပြီ", ProactiveAlertDispatcher.ACTION_HOME_EXIT
+                        )
                     }
                 }
                 GEOFENCE_ID_OFFICE -> {
@@ -52,29 +47,17 @@ class GeofenceReceiver : BroadcastReceiver() {
                     LocationTriggerStorage.markGeofenceTriggered(context, "office")
                     if (isEnter) {
                         Log.d(TAG, "Office geofence entered")
-                        val serviceIntent = Intent(context, LocationArrivalSpeakerService::class.java).apply {
-                            putExtra(LocationArrivalSpeakerService.EXTRA_MESSAGE, "ခုပဲ ရောက်တာလား")
-                            putExtra(LocationArrivalSpeakerService.EXTRA_ACTION, LocationArrivalSpeakerService.ACTION_OFFICE)
-                        }
-                        startService(context, serviceIntent)
+                        ProactiveAlertDispatcher.dispatchLocationArrival(
+                            context, "ခုပဲ ရောက်တာလား", ProactiveAlertDispatcher.ACTION_OFFICE
+                        )
                     } else {
                         Log.d(TAG, "Office geofence exited")
-                        val serviceIntent = Intent(context, LocationArrivalSpeakerService::class.java).apply {
-                            putExtra(LocationArrivalSpeakerService.EXTRA_MESSAGE, "ရုံးကနေ ထွက်သွားပြီ")
-                            putExtra(LocationArrivalSpeakerService.EXTRA_ACTION, LocationArrivalSpeakerService.ACTION_OFFICE_EXIT)
-                        }
-                        startService(context, serviceIntent)
+                        ProactiveAlertDispatcher.dispatchLocationArrival(
+                            context, "ရုံးကနေ ထွက်သွားပြီ", ProactiveAlertDispatcher.ACTION_OFFICE_EXIT
+                        )
                     }
                 }
             }
-        }
-    }
-
-    private fun startService(context: Context, intent: Intent) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
         }
     }
 

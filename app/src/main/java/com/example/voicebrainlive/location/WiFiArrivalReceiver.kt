@@ -8,6 +8,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.util.Log
+import com.example.voicebrainlive.proactive.ProactiveAlertDispatcher
 
 /**
  * Event-Driven: Office WiFi ချိတ်ဆက်တဲ့အခါ "ခုပဲ ရောက်တာလား" ပြောမယ်
@@ -28,15 +29,9 @@ class WiFiArrivalReceiver : BroadcastReceiver() {
         LocationTriggerStorage.markTriggered(context, normalizedCurrent)
 
         Log.d(TAG, "Office WiFi arrived: $currentSsid")
-        val serviceIntent = Intent(context, LocationArrivalSpeakerService::class.java).apply {
-            putExtra(LocationArrivalSpeakerService.EXTRA_MESSAGE, "ခုပဲ ရောက်တာလား")
-            putExtra(LocationArrivalSpeakerService.EXTRA_ACTION, LocationArrivalSpeakerService.ACTION_OFFICE)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
-        } else {
-            context.startService(serviceIntent)
-        }
+        ProactiveAlertDispatcher.dispatchLocationArrival(
+            context, "ခုပဲ ရောက်တာလား", ProactiveAlertDispatcher.ACTION_OFFICE
+        )
     }
 
     private fun getCurrentSsid(context: Context): String? {
@@ -49,7 +44,6 @@ class WiFiArrivalReceiver : BroadcastReceiver() {
             val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             val info = wifi?.connectionInfo ?: return null
             val ssid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                // API 33+ getSSID() deprecated
                 info.ssid?.let { if (it == "<unknown ssid>") null else it }
             } else {
                 @Suppress("DEPRECATION")
@@ -78,15 +72,9 @@ class WiFiArrivalReceiver : BroadcastReceiver() {
             if (normalizedCurrent != normalizedOffice) return
             if (!LocationTriggerStorage.shouldTrigger(context, normalizedCurrent)) return
             LocationTriggerStorage.markTriggered(context, normalizedCurrent)
-            val intent = Intent(context, LocationArrivalSpeakerService::class.java).apply {
-                putExtra(LocationArrivalSpeakerService.EXTRA_MESSAGE, "ခုပဲ ရောက်တာလား")
-                putExtra(LocationArrivalSpeakerService.EXTRA_ACTION, LocationArrivalSpeakerService.ACTION_OFFICE)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            ProactiveAlertDispatcher.dispatchLocationArrival(
+                context, "ခုပဲ ရောက်တာလား", ProactiveAlertDispatcher.ACTION_OFFICE
+            )
         }
 
         private fun getCurrentSsidStatic(context: Context): String? {

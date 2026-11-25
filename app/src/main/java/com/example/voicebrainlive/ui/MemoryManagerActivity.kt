@@ -2,6 +2,7 @@ package com.example.voicebrainlive.ui
 
 import android.app.AlertDialog
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -17,6 +18,7 @@ import com.example.voicebrainlive.databinding.ActivityMemoryManagerBinding
 import com.example.voicebrainlive.learning.IntentPatternLearner
 import com.example.voicebrainlive.memory.NoteRepository
 import com.example.voicebrainlive.memory.PersistentFactsStorage
+import com.example.voicebrainlive.memory.PortableMemoryBackup
 import com.example.voicebrainlive.memory.VoiceBrainDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,6 +33,50 @@ class MemoryManagerActivity : AppCompatActivity() {
     private var selectedCategory: MemoryCategory? = null
     private var currentSearchQuery: String = ""
 
+    private val exportBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri ?: return@registerForActivityResult
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val json = PortableMemoryBackup.exportJson(this@MemoryManagerActivity)
+                contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MemoryManagerActivity, "Backup သိမ်းဆည်းပြီးပါပြီ", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MemoryManagerActivity, "Backup မအောင်မြင်ပါ: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private val importBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@registerForActivityResult
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val raw = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    ?: error("Empty file")
+                val summary = PortableMemoryBackup.importJson(this@MemoryManagerActivity, raw, replaceExisting = false)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MemoryManagerActivity,
+                        "Restore ပြီးပါပြီ (Facts ${summary.factsRestored}, Notes ${summary.notesRestored}, Routines ${summary.routinesRestored})",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    loadAllMemories()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MemoryManagerActivity, "Restore မအောင်မြင်ပါ: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMemoryManagerBinding.inflate(layoutInflater)
@@ -39,6 +85,7 @@ class MemoryManagerActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener {
             finish()
         }
+        setupBackupMenu()
 
         adapter = MemoryAdapter(
             onEditClick = { item -> showEditMemoryDialog(item) },
@@ -54,6 +101,25 @@ class MemoryManagerActivity : AppCompatActivity() {
         setupAddButton()
 
         loadAllMemories()
+    }
+
+    private fun setupBackupMenu() {
+        val menu = binding.toolbar.menu
+        menu.add(0, 1001, 0, "Backup ထုတ်မည် (Export JSON)")
+        menu.add(0, 1002, 1, "Backup ပြန်သွင်းမည် (Import JSON)")
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1001 -> {
+                    exportBackupLauncher.launch("voicebrain_memory_backup.json")
+                    true
+                }
+                1002 -> {
+                    importBackupLauncher.launch(arrayOf("application/json", "*/*"))
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun setupViewModeSwitcher() {
