@@ -39,8 +39,8 @@ android {
         applicationId = "com.example.voicebrainlive"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "1.6.9"
+        versionCode = 23
+        versionName = "1.6.10"
         buildConfigField("boolean", "PRIVATE_TEST_BUILD", "false")
         // Dedicated VoiceBrainLive release origin. Never fall back to Smart Salary.
         val updateBaseUrl = getLocalProperty("UPDATE_BASE_URL", "https://voicebrainlive.vercel.app")
