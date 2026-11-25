@@ -174,6 +174,18 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
                 listener?.onSpeakOfflineResponse(display)
                 return@launch
             }
+            val missionResult = tryAutonomousMission(trimmed, executor)
+            if (missionResult != null) {
+                if (phoneExecutor !== executor) return@launch
+                val display = formatLocalCommandResult(missionResult)
+                _statusMessage.value = "Agent ပြီးဆုံးပါပြီ"
+                _transcript.value = display
+                com.example.voicebrainlive.commands.ChatUiBridge.notifyAssistant(display)
+                saveConversationMemory(trimmed, display)
+                VoiceHistory.add(app, trimmed, display)
+                listener?.onSpeakOfflineResponse(display)
+                return@launch
+            }
             // 1. Check Fast-Path Learned Intent
             val fast = tryFastPathCommand(trimmed)
             if (fast != null) {
@@ -219,6 +231,21 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
     suspend fun tryFastPathCommand(text: String): LearnedIntentExecutor.FastPathResult? {
         if (!::phoneExecutor.isInitialized) return null
         return LearnedIntentExecutor.tryExecute(app, text, phoneExecutor)
+    }
+
+    private suspend fun tryAutonomousMission(text: String, executor: PhoneCommandExecutor): String? {
+        val lower = text.trim().lowercase()
+        return when {
+            lower.startsWith("agent:") || lower.startsWith("jarvis:") -> {
+                val goal = text.substringAfter(':').trim()
+                if (goal.isBlank()) null else executor.executeAsync("run_agent_goal", goal, null)
+            }
+            lower == "မနက်ခင်း အစီအစဉ် ပြောပြပေး" || lower == "morning brief" ->
+                executor.executeAsync("get_morning_brief", text, null)
+            lower == "ai technology news ရှာပြီး notion ထဲ သိမ်းပေး" ->
+                executor.executeAsync("research_to_notion", "AI technology news", null)
+            else -> null
+        }
     }
 
     private fun scheduleVoiceFastPath(transcript: String) {

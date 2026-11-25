@@ -1239,7 +1239,8 @@ class VoiceLiveService : Service() {
                         else -> VoiceStatus.IDLE
                     }
                     val transcript = lastTranscriptText
-                    
+                    val agentState by com.example.voicebrainlive.agent.AgentProgressBus.state.collectAsState()
+
                     OverlayLiveCardScreen(
                         statusText = status,
                         voiceStatus = voiceStatus,
@@ -1249,6 +1250,7 @@ class VoiceLiveService : Service() {
                         notifSender = currentNotifSender,
                         notifText = currentNotifText,
                         lastTranscript = transcript,
+                        agentState = agentState,
                         onMuteClick = { toggleMute() },
                         onPauseClick = { togglePause() },
                         onCloseClick = { 
@@ -1266,8 +1268,8 @@ class VoiceLiveService : Service() {
                             }
                             startActivity(intent)
                         },
-                        onActionVideo = { Toast.makeText(this@VoiceLiveService, "Video Live feature coming soon!", Toast.LENGTH_SHORT).show() },
-                        onActionScreenshare = { Toast.makeText(this@VoiceLiveService, "Screenshare feature coming soon!", Toast.LENGTH_SHORT).show() },
+                        onActionVideo = { sendTextInput("မနက်ခင်း အစီအစဉ် ပြောပြပေး") },
+                        onActionScreenshare = { sendTextInput("ဒီစခရင်ပေါ်က အချက်အလက်တွေကို ဖတ်ပြပေး") },
                         onMinimize = { updateOverlay(OverlayState.PILL) }
                     )
                 }

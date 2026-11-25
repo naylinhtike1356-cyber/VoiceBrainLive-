@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.voicebrainlive.agent.AgentProgressBus
 import com.example.voicebrainlive.ui.theme.*
 import java.util.Calendar
 
@@ -67,7 +69,14 @@ fun HomeDashboardScreen(
     onTaskClick: (PendingTaskCardModel) -> Unit = {},
     onViewAllTasks: () -> Unit = onQuickAutomate,
     connectionState: HomeConnectionState = HomeConnectionState.READY,
-    onSetupClick: () -> Unit = {}
+    onSetupClick: () -> Unit = {},
+    personaLabel: String = "J.A.R.V.I.S.",
+    wakePhraseLabel: String = "Hey Jarvis",
+    accessibilityReady: Boolean = false,
+    agentState: AgentProgressBus.AgentExecutionState = AgentProgressBus.AgentExecutionState(),
+    onToggleWakeWord: (() -> Unit)? = null,
+    onOpenAssistSettings: (() -> Unit)? = null,
+    onRunAgentMission: ((String) -> Unit)? = null
 ) {
     var textInput by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
@@ -141,7 +150,7 @@ fun HomeDashboardScreen(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "AI Voice Assistant",
+                    text = "$personaLabel • AI Agent",
                     color = VoiceBrainText,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -175,12 +184,37 @@ fun HomeDashboardScreen(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        // ── 1.5 J.A.R.V.I.S. SYSTEM TELEMETRY STRIP ─────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TelemetryPill(
+                label = if (wakeWordActive) "🎙️ Wake: \"$wakePhraseLabel\"" else "🎙️ Wake: OFF",
+                active = wakeWordActive,
+                onClick = { onToggleWakeWord?.invoke() ?: onStatusCardClick() }
+            )
+            TelemetryPill(
+                label = if (accessibilityReady) "🦾 Screen Co-Pilot: ON" else "🦾 Screen Co-Pilot: Setup",
+                active = accessibilityReady,
+                onClick = { onOpenAssistSettings?.invoke() ?: onStatusCardClick() }
+            )
+            TelemetryPill(
+                label = "⚡ Default Assist",
+                active = true,
+                onClick = { onOpenAssistSettings?.invoke() ?: onStatusCardClick() }
+            )
+        }
 
-        // ── 2. HERO VOICE CENTER (Compact Fluid Orb + CTA) ─────────────
+        Spacer(Modifier.height(4.dp))
+
+        // ── 2. HERO VOICE CENTER (Arc-Reactor + Compact Fluid Orb + CTA) ──
         Box(
             modifier = Modifier
-                .size(240.dp)
+                .size(252.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
@@ -194,6 +228,10 @@ fun HomeDashboardScreen(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            JarvisArcReactorCore(
+                voiceStatus = voiceStatus,
+                modifier = Modifier.size(244.dp)
+            )
             AssistantFluidOrb(status = voiceStatus)
         }
 
@@ -236,8 +274,8 @@ fun HomeDashboardScreen(
 
         // Wake word hint
         Text(
-            text = if (wakeWordActive) "\"Hey Voice\" ဟု အသံဖြင့် နှိုးနိုင်ပါသည်"
-                   else "အသံဖြင့် အဆင်ပြေစွာ ခိုင်းစေနိုင်ပါသည်",
+            text = if (wakeWordActive) "\"$wakePhraseLabel\" ဟု အသံဖြင့် ခေါ်၍ စေခိုင်းနိုင်ပါသည်"
+                   else "Wake Word ဖွင့်ထားပါက \"$wakePhraseLabel\" ဟု ခေါ်၍ စေခိုင်းနိုင်သည်",
             color = VoiceBrainTextMuted,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 6.dp, bottom = 14.dp)
@@ -296,6 +334,70 @@ fun HomeDashboardScreen(
                         Box(contentAlignment = Alignment.Center) {
                             Text("➔", color = VoiceBrainBackground, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ── 3.5 AUTONOMOUS AI AGENT MISSIONS (1-Tap Jarvis Tasks) ──────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AgentMissionChip("☀️ Morning Brief") {
+                val cmd = "မနက်ခင်း အစီအစဉ် ပြောပြပေး"
+                onRunAgentMission?.invoke(cmd) ?: onTextSubmit(cmd)
+            }
+            AgentMissionChip("📰 AI News → Notion") {
+                val cmd = "AI technology news ရှာပြီး Notion ထဲ သိမ်းပေး"
+                onRunAgentMission?.invoke(cmd) ?: onTextSubmit(cmd)
+            }
+            AgentMissionChip("📱 Screen Co-Pilot") {
+                val cmd = "ဒီစခရင်ပေါ်က အချက်အလက်တွေကို ဖတ်ပြပေး"
+                onRunAgentMission?.invoke(cmd) ?: onTextSubmit(cmd)
+            }
+            AgentMissionChip("🔋 System Check") {
+                val cmd = "ဖုန်း battery နဲ့ wifi အခြေအနေ စစ်ပေး"
+                onRunAgentMission?.invoke(cmd) ?: onTextSubmit(cmd)
+            }
+        }
+
+        // Live Agent Progress Card
+        AnimatedVisibility(visible = agentState.steps.isNotEmpty() || agentState.isRunning) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                color = Color(0xFF0E1830),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, VoiceBrainSecondary.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = "🤖 ${agentState.goal.ifBlank { "Autonomous Agent" }} • ${agentState.phase.name}",
+                        color = VoiceBrainSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    agentState.steps.forEach { step ->
+                        val icon = when (step.status) {
+                            AgentProgressBus.StepStatus.DONE -> "✓"
+                            AgentProgressBus.StepStatus.RUNNING -> "⟳"
+                            AgentProgressBus.StepStatus.BLOCKED -> "⚠"
+                            AgentProgressBus.StepStatus.FAILED -> "✕"
+                            AgentProgressBus.StepStatus.PENDING -> "•"
+                        }
+                        Text(
+                            text = "$icon ${step.title}",
+                            color = VoiceBrainTextSecondary,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
@@ -702,5 +804,53 @@ private fun RowScope.DashboardTile(item: DashboardItem?) {
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Composable
+private fun TelemetryPill(
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    val accent = if (active) VoiceBrainSecondary else VoiceBrainTextMuted
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable { onClick() },
+        color = if (active) VoiceBrainSecondary.copy(alpha = 0.14f) else VoiceBrainSurfaceSoft,
+        shape = RoundedCornerShape(50),
+        border = androidx.compose.foundation.BorderStroke(0.9.dp, accent.copy(alpha = 0.55f))
+    ) {
+        Text(
+            text = label,
+            color = if (active) Color(0xFFE0F2FE) else VoiceBrainTextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun AgentMissionChip(
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        color = Color(0xFF13203E),
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, VoiceBrainPrimaryLight.copy(alpha = 0.45f))
+    ) {
+        Text(
+            text = label,
+            color = VoiceBrainText,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
     }
 }

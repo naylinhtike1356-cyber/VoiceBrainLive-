@@ -100,7 +100,11 @@ class HomeFragment : Fragment() {
                         }
                     }
 
-                    val isWakeActive = WakeWordPrefs.isEnabled(requireContext())
+                    var isWakeActive by remember { mutableStateOf(WakeWordPrefs.isEnabled(requireContext())) }
+                    val personaLabel = remember { WakeWordPrefs.getPersona(requireContext()).displayName }
+                    val wakePhraseLabel = remember { WakeWordPrefs.getWakeDisplayLabel(requireContext()) }
+                    val accessibilityReady = VoiceBrainAccessibilityService.instance != null
+                    val agentState by com.example.voicebrainlive.agent.AgentProgressBus.state.collectAsState()
                     val powerManager = requireContext().getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
                     val isBatteryOptimized = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                         powerManager?.isIgnoringBatteryOptimizations(requireContext().packageName) != true
@@ -118,6 +122,44 @@ class HomeFragment : Fragment() {
                         voiceStatus = voiceStatus,
                         wakeWordActive = isWakeActive,
                         batteryOptimized = isBatteryOptimized,
+                        personaLabel = personaLabel,
+                        wakePhraseLabel = wakePhraseLabel,
+                        accessibilityReady = accessibilityReady,
+                        agentState = agentState,
+                        onToggleWakeWord = {
+                            performHaptic()
+                            val ctx = requireContext()
+                            if (isWakeActive) {
+                                WakeWordPrefs.setEnabled(ctx, false)
+                                ctx.stopService(Intent(ctx, WakeWordListenerService::class.java))
+                                isWakeActive = false
+                            } else {
+                                if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                    WakeWordPrefs.setEnabled(ctx, true)
+                                    val wwIntent = Intent(ctx, WakeWordListenerService::class.java)
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                        ctx.startForegroundService(wwIntent)
+                                    } else {
+                                        ctx.startService(wwIntent)
+                                    }
+                                    isWakeActive = true
+                                } else {
+                                    startActivity(Intent(ctx, SettingsActivity::class.java))
+                                }
+                            }
+                        },
+                        onOpenAssistSettings = {
+                            performHaptic()
+                            try {
+                                startActivity(Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS))
+                            } catch (_: Exception) {
+                                startActivity(Intent(requireContext(), SettingsActivity::class.java))
+                            }
+                        },
+                        onRunAgentMission = { missionCmd ->
+                            performHaptic()
+                            sendText(missionCmd)
+                        },
                         pendingTasks = pendingTasks,
                         onTaskClick = { task ->
                             performHaptic()

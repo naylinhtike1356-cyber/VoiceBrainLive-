@@ -2,6 +2,8 @@ package com.example.voicebrainlive.commands.handlers
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.voicebrainlive.agent.AutonomousAgentEngine
+
 /**
  * Tool Registry Implementation - Routes commands to appropriate handlers.
  */
@@ -22,14 +24,23 @@ class ToolRegistryImpl(
     private val gemHandler = GemHandler(context)
     private val automationHandler = AutomationHandler(context)
     private val visionHandler = VisionHandler(context)
-
-
     private val translationHandler = TranslationHandler(context)
-
-
     private val locationHandler = LocationHandler(context)
     private val calendarHandler = CalendarHandler(context)
     private val accessibilityHandler = AccessibilityHandler(context)
+
+    private val autonomousAgentEngine by lazy {
+        AutonomousAgentEngine(
+            executeTool = { cmd, target, value ->
+                val normalized = cmd.trim().lowercase()
+                if (normalized in AGENT_META_COMMANDS) {
+                    "FAILED: Recursive agent invocation is not allowed."
+                } else {
+                    executeCommandAsync(cmd, target, value)
+                }
+            }
+        )
+    }
 
     /**
      * Handlers for commands not covered by the legacy when-dispatch blocks.
@@ -40,13 +51,9 @@ class ToolRegistryImpl(
         gemHandler,
         automationHandler,
         visionHandler,
-
-
         locationHandler,
         calendarHandler,
         translationHandler,
-
-
         accessibilityHandler
     )
 
@@ -97,6 +104,20 @@ class ToolRegistryImpl(
         if (commandType in setOf("open_app", "resume_music") && value?.startsWith(com.example.voicebrainlive.commands.ReviewedAppTarget.PREFIX) == true)
             return com.example.voicebrainlive.commands.ReviewedAppTarget.dispatch(context, commandType, target, value)
         return when (commandType.lowercase()) {
+            // Autonomous Multi-Step AI Agent Missions
+            "run_agent_goal" -> {
+                val goal = target?.takeIf { it.isNotBlank() } ?: value.orEmpty()
+                val explicitSteps = if (!target.isNullOrBlank() && !value.isNullOrBlank()) value else null
+                autonomousAgentEngine.runGoal(goal, explicitSteps).summary
+            }
+            "get_morning_brief" -> {
+                autonomousAgentEngine.runMorningBrief(target ?: "Morning Executive Brief").summary
+            }
+            "research_to_notion" -> {
+                val topic = target?.takeIf { it.isNotBlank() } ?: value.orEmpty()
+                autonomousAgentEngine.runResearchToNotion(topic).summary
+            }
+
             // Calling commands
             "make_call", "call", "dial", "call_contact", "call_quick_contact", "contact_call",
             "search_phone_contacts", "call_phone_contact",
@@ -184,9 +205,9 @@ class ToolRegistryImpl(
         }
     }
 
-    
     companion object {
-        private val LEGACY_COMMANDS = setOf("add_calendar_event","add_contact","add_memory","add_note","add_quick_contact","add_routine","add_scheduled_routine","add_to_playlist","append_notion_note","archive_notion_note","bluetooth_off","bluetooth_on","call","call_contact","call_phone_contact","call_quick_contact","clear_notes","contact_call","create_and_play_playlist","create_playlist","delete_all_notes","delete_contact","delete_fact","delete_note","delete_notion_note","delete_routine","delete_scheduled_routine","dial","directions","dismiss_alarm","edit_contact","edit_quick_contact","flashlight_off","flashlight_on","forget_fact","forget_memory","get_activity_data","get_battery_status","get_bluetooth_status","get_contacts","get_current_date","get_current_time","get_date","get_health_data","get_health_summary","get_memories","get_pending_reminders","get_remembered_facts","get_reminders","get_routines","get_sleep_data","get_time","get_weather","get_wifi_status","get_workout_data","health","health_summary","list_contacts","list_memories","list_notes","list_reminders","list_routines","list_scheduled_routines","make_call","media_next","media_pause","media_play","media_previous","media_stop","messenger","mute","mute_ringer","navigate_to","next","next_track","normal_mode","notion_append","notion_delete","notion_search","notion_sync","open_app","open_settings","open_youtube","pause","pause_music","play","play_music","play_spotify","play_youtube","previous","previous_track","query_memory","query_notion","read_action_logs","read_memories","read_notes","record_correction","remember","remember_fact","remove_memory","remove_routine","resume","resume_music","save_contact","save_correction","save_note","save_preference","screenshot","search","search_aliexpress","search_coupang","search_facts","search_memory","search_news","search_notion","search_phone_contacts","search_spotify","send_facebook_message","send_last_note_to_notion","send_messenger","send_sms","send_to_notion","send_whatsapp","set_alarm","set_listening_timeout","set_reminder","set_ringer_normal","set_ringer_silent","set_ringer_vibrate","set_timer","set_volume","show_notes","silent_mode","sleep","sleep_summary","spotify_play","steps","steps_summary","switch_profile","sync_notion","test_notion","toggle_flashlight","turn_off_bluetooth","turn_off_flashlight","turn_off_wifi","turn_on_bluetooth","turn_on_flashlight","turn_on_wifi","unmute","unmute_ringer","update_notion_note","vibrate_mode","vibration_on","volume_down","volume_up","weather","web_search","whatsapp","wifi_off","wifi_on","workout","workout_summary","youtube")
+        private val AGENT_META_COMMANDS = setOf("run_agent_goal", "get_morning_brief", "research_to_notion")
+        private val LEGACY_COMMANDS = setOf("add_calendar_event","add_contact","add_memory","add_note","add_quick_contact","add_routine","add_scheduled_routine","add_to_playlist","append_notion_note","archive_notion_note","bluetooth_off","bluetooth_on","call","call_contact","call_phone_contact","call_quick_contact","clear_notes","contact_call","create_and_play_playlist","create_playlist","delete_all_notes","delete_contact","delete_fact","delete_note","delete_notion_note","delete_routine","delete_scheduled_routine","dial","directions","dismiss_alarm","edit_contact","edit_quick_contact","flashlight_off","flashlight_on","forget_fact","forget_memory","get_activity_data","get_battery_status","get_bluetooth_status","get_contacts","get_current_date","get_current_time","get_date","get_health_data","get_health_summary","get_memories","get_morning_brief","get_pending_reminders","get_remembered_facts","get_reminders","get_routines","get_sleep_data","get_time","get_weather","get_wifi_status","get_workout_data","health","health_summary","list_contacts","list_memories","list_notes","list_reminders","list_routines","list_scheduled_routines","make_call","media_next","media_pause","media_play","media_previous","media_stop","messenger","mute","mute_ringer","navigate_to","next","next_track","normal_mode","notion_append","notion_delete","notion_search","notion_sync","open_app","open_settings","open_youtube","pause","pause_music","play","play_music","play_spotify","play_youtube","previous","previous_track","query_memory","query_notion","read_action_logs","read_memories","read_notes","record_correction","remember","remember_fact","remove_memory","remove_routine","research_to_notion","resume","resume_music","run_agent_goal","save_contact","save_correction","save_note","save_preference","screenshot","search","search_aliexpress","search_coupang","search_facts","search_memory","search_news","search_notion","search_phone_contacts","search_spotify","send_facebook_message","send_last_note_to_notion","send_messenger","send_sms","send_to_notion","send_whatsapp","set_alarm","set_listening_timeout","set_reminder","set_ringer_normal","set_ringer_silent","set_ringer_vibrate","set_timer","set_volume","show_notes","silent_mode","sleep","sleep_summary","spotify_play","steps","steps_summary","switch_profile","sync_notion","test_notion","toggle_flashlight","turn_off_bluetooth","turn_off_flashlight","turn_off_wifi","turn_on_bluetooth","turn_on_flashlight","turn_on_wifi","unmute","unmute_ringer","update_notion_note","vibrate_mode","vibration_on","volume_down","volume_up","weather","web_search","whatsapp","wifi_off","wifi_on","workout","workout_summary","youtube")
         private val COMMAND_SPECS = buildMap {
             fun spec(
                 command: String,
@@ -196,6 +217,9 @@ class ToolRegistryImpl(
                 put(command, ToolCommandSpec(command, permissions, description))
             }
 
+            spec("run_agent_goal", description = "Execute an autonomous multi-step AI Agent workflow")
+            spec("get_morning_brief", description = "Gather weather, calendar, reminders, and health into an executive brief")
+            spec("research_to_notion", description = "Search news/web for a topic and save structured summary to Notion or Notes")
             spec("make_call", setOf(android.Manifest.permission.CALL_PHONE), "Call a contact or phone number")
             spec("call_contact", setOf(android.Manifest.permission.CALL_PHONE), "Call a contact")
             spec("send_sms", setOf(android.Manifest.permission.SEND_SMS), "Send an SMS")

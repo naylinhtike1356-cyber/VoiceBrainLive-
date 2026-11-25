@@ -32,7 +32,9 @@ import java.util.UUID
 import androidx.activity.compose.setContent
 import android.view.Gravity
 import android.view.MotionEvent
+import com.example.voicebrainlive.agent.AgentProgressBus
 import com.example.voicebrainlive.ui.components.CameraNotchSoundBar
+import com.example.voicebrainlive.ui.components.JarvisAssistantHudOverlay
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -102,8 +104,12 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
     private var reconnectRunnable: Runnable? = null
     private var isProcessingTurn = false
     private var wakeOrigin = false
+    private var isOneShotWake = false
     private var wakeGreetingSpoken = false
     private var wakeWordRestartScheduled = false
+
+    private val useJarvisHud: Boolean
+        get() = WakeWordPrefs.getHudStyle(this) == WakeWordPrefs.HudStyle.JARVIS_EDGE
 
     private val permissionManager by lazy { PermissionManager(this) }
 
@@ -141,6 +147,7 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
         overridePendingTransition(0, 0)
         super.onCreate(savedInstanceState)
         wakeOrigin = intent?.getBooleanExtra("EXTRA_WAKE_ORIGIN", false) == true
+        isOneShotWake = intent?.getBooleanExtra("EXTRA_ONE_SHOT_WAKE", false) == true
 
         // Stop Wake Word Service to free up Microphone and prevent audio conflict/looping
         stopWakeWordService()
@@ -164,19 +171,48 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
         setupTransparentWindow()
 
         setContent {
-            Box(
-                modifier = Modifier
-                    .wrapContentSize()
-                    .background(Color.Transparent),
-                contentAlignment = Alignment.Center
-            ) {
-                CameraNotchSoundBar(
+            if (useJarvisHud) {
+                val agentState by AgentProgressBus.state.collectAsState()
+                val personaName = remember { WakeWordPrefs.getPersona(this@AssistantActivity).displayName }
+                JarvisAssistantHudOverlay(
+                    personaName = personaName,
+                    statusText = composeStatusText,
+                    transcriptText = composeTranscriptText,
+                    userInputText = composeUserInputText,
                     voiceStatus = composeVoiceStatus,
                     audioAmplitude = composeAudioAmplitude,
-                    onTap = {
-                        stopAndClose()
+                    isConnecting = composeIsConnecting,
+                    showRetry = composeShowRetry,
+                    agentState = agentState,
+                    onClose = { stopAndClose() },
+                    onRetry = {
+                        composeShowRetry = false
+                        startAssistant()
+                    },
+                    onSendText = { txt ->
+                        composeUserInputText = txt
+                        viewModel.sendTextInput(txt)
+                    },
+                    onQuickAction = { cmd ->
+                        composeUserInputText = cmd
+                        viewModel.sendTextInput(cmd)
                     }
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .wrapContentSize()
+                        .background(Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CameraNotchSoundBar(
+                        voiceStatus = composeVoiceStatus,
+                        audioAmplitude = composeAudioAmplitude,
+                        onTap = {
+                            stopAndClose()
+                        }
+                    )
+                }
             }
         }
 
@@ -373,6 +409,7 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
         setIntent(intent)
         if (intent.getBooleanExtra("EXTRA_WAKE_ORIGIN", false)) {
             wakeOrigin = true
+            isOneShotWake = intent.getBooleanExtra("EXTRA_ONE_SHOT_WAKE", false)
             wakeGreetingSpoken = false
         }
         
@@ -426,11 +463,19 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
             val statusBarHeight = if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else (28 * density).toInt()
 
             val params = attributes
-            params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            params.width = WindowManager.LayoutParams.WRAP_CONTENT
-            params.height = WindowManager.LayoutParams.WRAP_CONTENT
-            params.x = 0
-            params.y = statusBarHeight + (2 * density).toInt()
+            if (useJarvisHud) {
+                params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.height = WindowManager.LayoutParams.MATCH_PARENT
+                params.x = 0
+                params.y = 0
+            } else {
+                params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                params.width = WindowManager.LayoutParams.WRAP_CONTENT
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT
+                params.x = 0
+                params.y = statusBarHeight + (2 * density).toInt()
+            }
             params.dimAmount = 0f
             params.format = android.graphics.PixelFormat.TRANSLUCENT
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND.inv()
@@ -492,6 +537,7 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
                 }
 
                 pendingTextInput?.let {
+                    composeUserInputText = it
                     showTranscript(it)
                     viewModel.sendTextInput(it)
                     pendingTextInput = null
@@ -676,9 +722,10 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
     }
 
     private fun speakWakeGreetingIfNeeded() {
-        if (!wakeOrigin || wakeGreetingSpoken || isAutomationMode) return
+        if (!wakeOrigin || isOneShotWake || wakeGreetingSpoken || isAutomationMode) return
         wakeGreetingSpoken = true
-        val greeting = "မင်္ဂလာပါ၊ Luma နိုးလာပါပြီ။ ဘာလုပ်ပေးရမလဲ?"
+        val personaName = WakeWordPrefs.getPersona(this).displayName
+        val greeting = "မင်္ဂလာပါ၊ $personaName အသင့်ရှိပါပြီ။ ဘာလုပ်ပေးရမလဲ?"
         showTranscript(greeting)
         updateStatusText("နားထောင်နေပါတယ်...")
         val finishGreeting = {
@@ -719,6 +766,12 @@ class AssistantActivity : androidx.fragment.app.FragmentActivity(),
             if (service.isGeminiReady) {
                 if (wakeOrigin) speakWakeGreetingIfNeeded()
                 startWaveformAnimation()
+                pendingTextInput?.let {
+                    composeUserInputText = it
+                    showTranscript(it)
+                    viewModel.sendTextInput(it)
+                    pendingTextInput = null
+                }
             }
             return
         }

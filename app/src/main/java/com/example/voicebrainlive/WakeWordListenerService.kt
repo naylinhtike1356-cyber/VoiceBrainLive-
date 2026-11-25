@@ -6,31 +6,31 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.media.AudioManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.media.AudioManager
-
+import android.os.PowerManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import androidx.core.content.ContextCompat
-import android.os.BatteryManager
-import android.content.IntentFilter
-import java.util.Locale
 
 /**
- * Wake Word Listener – "Hey Voice" / "Voice Brain" ပြောပြီး Assistant နှိုးချင်။
+ * Wake Word Listener – "Hey Jarvis" / "Hey Luma" / Custom Wake Phrase ပြောပြီး Assistant နှိုးချင်။
  * SpeechRecognizer နဲ့ continuous listening, phrase match ရင် AssistantActivity ဖွင့်သည်။
+ * One-shot command ပါလာပါက ("Hey Jarvis, ဓာတ်မီးဖွင့်") တိုက်ရိုက် ဆက်လက်လုပ်ဆောင်သည်။
  * Battery Saver: proximity sensor သုံးပြီး pocket/face down ဖြစ်ရင် Mic ပိတ်ထားမည်။
  */
 class WakeWordListenerService : Service(), SensorEventListener {
@@ -41,7 +41,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
 
     private var speechRecognizer: SpeechRecognizer? = null
     private val handler = Handler(Looper.getMainLooper())
-        private var cooldownUntil = 0L
+    private var cooldownUntil = 0L
     private var restartDelayMs = 3000L
     private var restartScheduled = false
     private var consecutiveQuietSessions = 0
@@ -58,7 +58,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
-                super.onCreate()
+        super.onCreate()
         wakeHandled = false
         Log.d(TAG, "WakeWordListenerService onCreate")
 
@@ -67,14 +67,14 @@ class WakeWordListenerService : Service(), SensorEventListener {
             stopSelf()
             return
         }
-        
+
         // Initialize Proximity Sensor for Battery Saving
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
         proximitySensor?.let {
             sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
-        
+
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             startListening()
         } else {
@@ -91,7 +91,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
         return START_STICKY
     }
 
-        private fun startListening() {
+    private fun startListening() {
         if (recognitionSessionActive || isDestroyed) return
         handler.removeCallbacksAndMessages(null)
         restartScheduled = false
@@ -105,10 +105,11 @@ class WakeWordListenerService : Service(), SensorEventListener {
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {}
-                        override fun onError(error: Int) {
-                            recognitionSessionActive = false
-                            if (wakeHandled) return
-                            when (error) {
+
+                override fun onError(error: Int) {
+                    recognitionSessionActive = false
+                    if (wakeHandled) return
+                    when (error) {
                         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                             Log.e(TAG, "Wake word permission revoked, stopping service")
                             WakeWordPrefs.setEnabled(this@WakeWordListenerService, false)
@@ -117,13 +118,15 @@ class WakeWordListenerService : Service(), SensorEventListener {
                         }
                         SpeechRecognizer.ERROR_NO_MATCH,
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                            // User was silent or timed out - restart quickly to keep wake word responsive
-                                                        consecutiveQuietSessions = (consecutiveQuietSessions + 1).coerceAtMost(6)
-                            // Do not restart every second: Samsung recognition services
-                            // may emit a start/stop click for each new session.
-                            restartDelayMs = (15000L + consecutiveQuietSessions * 5000L).coerceAtMost(30000L)
+                            // Responsive when screen is active; conservative backoff when idle/screen off.
+                            consecutiveQuietSessions = (consecutiveQuietSessions + 1).coerceAtMost(6)
+                            val interactive = isScreenInteractive()
+                            restartDelayMs = if (interactive) {
+                                (1500L + consecutiveQuietSessions * 700L).coerceAtMost(5000L)
+                            } else {
+                                (12000L + consecutiveQuietSessions * 3000L).coerceAtMost(30000L)
+                            }
                             scheduleRestart()
-
                         }
                         SpeechRecognizer.ERROR_AUDIO,
                         SpeechRecognizer.ERROR_CLIENT,
@@ -137,7 +140,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
                             Log.w(TAG, "SpeechRecognizer error: $error. Backing off.")
                             scheduleRestartWithBackoff()
                         }
-                                                SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT,
+                        SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT,
                         SpeechRecognizer.ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS,
                         SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
                         SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
@@ -151,19 +154,19 @@ class WakeWordListenerService : Service(), SensorEventListener {
                             }
                             scheduleRestart()
                         }
-
                     }
                 }
+
                 override fun onResults(results: Bundle?) {
                     recognitionSessionActive = false
                     checkResults(results)
                     if (wakeHandled) return
 
                     consecutiveQuietSessions = 0
-                    restartDelayMs = 5000L
+                    restartDelayMs = if (isScreenInteractive()) 750L else 5000L
                     scheduleRestart()
-
                 }
+
                 override fun onPartialResults(partialResults: Bundle?) {
                     // Never trigger from partial recognition.
                 }
@@ -176,33 +179,52 @@ class WakeWordListenerService : Service(), SensorEventListener {
 
     private fun checkResults(results: Bundle?) {
         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return
-        // Only the best final result is considered. WakeWordMatcher requires the
-        // phrase at the beginning of a short transcript, never as a substring.
-        val text = matches.firstOrNull().orEmpty()
-        val confidence = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
-            ?.firstOrNull()
-        if (WakeWordMatcher.matchesFinalTranscript(text, confidence)) {
-            onWakeWordDetected()
+        val confidences = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
+        val customPhrase = WakeWordPrefs.getCustomPhrase(this)
+        for ((idx, text) in matches.take(3).withIndex()) {
+            val confidence = confidences?.getOrNull(idx)
+            val match = WakeWordMatcher.matchWithCommand(
+                transcript = text,
+                confidence = confidence,
+                customPhrase = customPhrase
+            )
+            if (match.matched) {
+                onWakeWordDetected(match.trailingCommand)
+                return
+            }
         }
     }
 
-        private fun onWakeWordDetected() {
+    private fun isScreenInteractive(): Boolean {
+        return try {
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            pm?.isInteractive != false
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    private fun onWakeWordDetected(initialCommand: String? = null) {
         if (wakeHandled || System.currentTimeMillis() < cooldownUntil) return
         wakeHandled = true
         cooldownUntil = System.currentTimeMillis() + COOLDOWN_MS
         handler.removeCallbacksAndMessages(null)
         restartScheduled = false
-        Log.d(TAG, "Wake word detected; stopping wake service before opening Assistant")
+        Log.d(TAG, "Wake word detected (oneShot=${!initialCommand.isNullOrBlank()}); opening Assistant")
 
         // Stop the recognizer before opening the assistant so it cannot hear the
         // assistant's own audio and trigger another wake cycle.
         speechRecognizer?.cancel()
         wakeFeedback()
         handler.post {
-                        val intent = Intent(this, AssistantActivity::class.java).apply {
+            val intent = Intent(this, AssistantActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
                 putExtra("EXTRA_WAKE_ORIGIN", true)
+                if (!initialCommand.isNullOrBlank()) {
+                    putExtra(MainActivity.EXTRA_TEXT_INPUT, initialCommand)
+                    putExtra("EXTRA_ONE_SHOT_WAKE", true)
+                }
             }
 
             startActivity(intent)
@@ -245,14 +267,13 @@ class WakeWordListenerService : Service(), SensorEventListener {
 
         val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL
+            status == BatteryManager.BATTERY_STATUS_FULL
 
         return batteryPct < 15f && !isCharging
     }
 
-        private fun restartListening() {
+    private fun restartListening() {
         if (wakeHandled || !WakeWordPrefs.isEnabled(this)) {
-
             stopSelf()
             return
         }
@@ -263,7 +284,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
             scheduleRestart()
             return
         }
-                // Battery Saver: If proximity sensor says completely covered, don't restart speech recognizer right now.
+        // Battery Saver: If proximity sensor says completely covered, don't restart speech recognizer right now.
         // It will restart automatically when the sensor detects it is uncovered.
         if (isCovered) {
             Log.d(TAG, "Phone is covered (Battery Saver Action). Pausing Wake Word.")
@@ -281,14 +302,13 @@ class WakeWordListenerService : Service(), SensorEventListener {
             return
         }
         try {
-
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                // Partial results are intentionally disabled: they frequently
+                // Partial results are intentionally disabled: they frequently
                 // contain transient words from ordinary background speech.
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
 
-                                // Prefer Burmese pronunciation; fall back to en-US if the
+                // Prefer Burmese pronunciation; fall back to en-US if the
                 // device speech service reports Burmese as unavailable.
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLanguage)
 
@@ -296,7 +316,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
                 // ကလုံသံ နည်းအောင် – ဆူညံသံ ၁.၅ စက္ကန့်စောင့်ပြီးမှ ပြန်စ (Faster Start-to-End detection)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500)
-                // "Hey voice" တိုသောစကားအတွက် ၅၀၀ ms ပဲ လိုသည် 
+                // "Hey voice" တိုသောစကားအတွက် ၅၀၀ ms ပဲ လိုသည်
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 500)
             }
             speechRecognizer?.startListening(intent)
@@ -343,7 +363,7 @@ class WakeWordListenerService : Service(), SensorEventListener {
         // Not needed
     }
 
-        private var isDestroyed = false
+    private var isDestroyed = false
 
     override fun onDestroy() {
         isDestroyed = true
@@ -402,9 +422,11 @@ class WakeWordListenerService : Service(), SensorEventListener {
                 Intent(this, SettingsActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
+            val personaName = WakeWordPrefs.getPersona(this).displayName
+            val wakeLabel = WakeWordPrefs.getWakeDisplayLabel(this)
             val notification = NotificationCompat.Builder(this, channelId)
-                .setContentTitle("Voice Brain")
-                .setContentText("Hey Voice / Voice Brain ပြောပြီး နှိုးနေသည်")
+                .setContentTitle("$personaName • Ready")
+                .setContentText("\"$wakeLabel\" ဟု ခေါ်၍ စေခိုင်းနိုင်သည်")
                 .setSmallIcon(R.drawable.ic_mic)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
@@ -414,15 +436,13 @@ class WakeWordListenerService : Service(), SensorEventListener {
             // Android 14 (API 34) requires specific types and declared permissions
             val serviceType = when {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
-                    // API 34+: must check permission before starting microphone service
                     if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
                     } else {
-                        0 // Fallback to no type (may fail if required, but better than a crash)
+                        0
                     }
                 }
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                    // API 29-33: support microphone type
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
                 }
                 else -> 0

@@ -1,24 +1,20 @@
 package com.example.voicebrainlive.ui.components
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import com.example.voicebrainlive.BubblePrefs
+import com.example.voicebrainlive.agent.AgentProgressBus
 
 @Composable
 fun OverlayLiveCardScreen(
@@ -30,6 +26,7 @@ fun OverlayLiveCardScreen(
     notifSender: String = "",
     notifText: String = "",
     lastTranscript: String = "",
+    agentState: AgentProgressBus.AgentExecutionState = AgentProgressBus.AgentExecutionState(),
     onMuteClick: () -> Unit,
     onPauseClick: () -> Unit,
     onCloseClick: () -> Unit,
@@ -43,24 +40,23 @@ fun OverlayLiveCardScreen(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF0F172A).copy(alpha = 0.96f))
+            .background(Color(0xFF0A1124).copy(alpha = 0.96f))
             .padding(16.dp)
     ) {
-        // Top Bar with Pyit Tine Htaung Mascot & Controls
+        // Top Bar with Arc-Reactor / Mascot & Controls
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Pyit Tine Htaung Animated Avatar Icon
             Box(
                 modifier = Modifier
-                    .size(68.dp)
+                    .size(64.dp)
                     .clickable { onMinimize() },
                 contentAlignment = Alignment.Center
             ) {
-                AnimatedPyitTineHtaungAvatar(
-                    status = voiceStatus,
-                    modifier = Modifier.size(64.dp)
+                JarvisArcReactorCore(
+                    voiceStatus = voiceStatus,
+                    modifier = Modifier.size(60.dp)
                 )
             }
 
@@ -68,20 +64,21 @@ fun OverlayLiveCardScreen(
 
             // Status Text & App Name
             Column(modifier = Modifier.weight(1f)) {
-                val statusLabel = when (voiceStatus) {
-                    VoiceStatus.SPEAKING -> "🗣️ Agent ရှင်းပြနေသည်..."
-                    VoiceStatus.LISTENING -> "🎙️ Agent နားထောင်နေသည်..."
-                    VoiceStatus.PROCESSING -> "🧠 Agent စဉ်းစားနေသည်..."
-                    else -> if (statusText.isNotBlank()) statusText else "✨ Pyit Tine Htaung Agent"
+                val statusLabel = when {
+                    agentState.isRunning -> "🤖 Agent လုပ်ဆောင်နေသည်..."
+                    voiceStatus == VoiceStatus.SPEAKING -> "🗣️ J.A.R.V.I.S. ဖြေကြားနေသည်..."
+                    voiceStatus == VoiceStatus.LISTENING -> "🎙️ နားထောင်နေသည်..."
+                    voiceStatus == VoiceStatus.PROCESSING -> "🧠 စဉ်းစားနေသည်..."
+                    else -> if (statusText.isNotBlank()) statusText else "✨ J.A.R.V.I.S. Ready"
                 }
                 Text(
                     text = statusLabel,
                     color = Color.White,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (notifApp.isNotBlank()) "🔔 $notifApp Notification" else "Voice Brain AI Assistant",
+                    text = if (notifApp.isNotBlank()) "🔔 $notifApp Notification" else "Voice Brain AI Agent",
                     color = Color(0xFF38BDF8),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
@@ -132,6 +129,42 @@ fun OverlayLiveCardScreen(
             }
         }
 
+        // Live Autonomous Agent Step Timeline
+        if (agentState.steps.isNotEmpty() || agentState.isRunning) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF111C38))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "🤖 ${agentState.goal.ifBlank { "Agent Mission" }}",
+                    color = Color(0xFF38BDF8),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                agentState.steps.take(4).forEach { step ->
+                    val prefix = when (step.status) {
+                        AgentProgressBus.StepStatus.DONE -> "✓"
+                        AgentProgressBus.StepStatus.RUNNING -> "⟳"
+                        AgentProgressBus.StepStatus.BLOCKED -> "⚠"
+                        AgentProgressBus.StepStatus.FAILED -> "✕"
+                        AgentProgressBus.StepStatus.PENDING -> "•"
+                    }
+                    Text(
+                        text = "$prefix ${step.title}",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
         // Live Transcript / AI Response preview
         if (lastTranscript.isNotBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -144,7 +177,7 @@ fun OverlayLiveCardScreen(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        Divider(color = Color(0xFF334155))
+        HorizontalDivider(color = Color(0xFF334155))
         Spacer(modifier = Modifier.height(12.dp))
 
         // Action Buttons
@@ -152,9 +185,9 @@ fun OverlayLiveCardScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            ActionButton("📹", "Video", onActionVideo)
-            ActionButton("💻", "Screen", onActionScreenshare)
-            ActionButton("✨", "Assistant", onActionLive)
+            ActionButton("☀️", "Brief", onActionVideo)
+            ActionButton("📱", "Screen AI", onActionScreenshare)
+            ActionButton("✨", "J.A.R.V.I.S.", onActionLive)
         }
     }
 }

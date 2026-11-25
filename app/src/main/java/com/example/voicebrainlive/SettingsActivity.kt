@@ -285,6 +285,27 @@ class SettingsActivity : FragmentActivity() {
         }
 
         binding.switchWakeWord.isChecked = WakeWordPrefs.isEnabled(this)
+        binding.etCustomWakePhrase.setText(WakeWordPrefs.getCustomPhrase(this))
+
+        val personas = WakeWordPrefs.AssistantPersona.entries
+        binding.spinnerAssistantPersona.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            personas.map { it.displayName }
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        binding.spinnerAssistantPersona.setSelection(personas.indexOf(WakeWordPrefs.getPersona(this)).coerceAtLeast(0))
+
+        val hudStyles = WakeWordPrefs.HudStyle.entries
+        binding.spinnerHudStyle.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            hudStyles.map { it.titleMm }
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        binding.spinnerHudStyle.setSelection(hudStyles.indexOf(WakeWordPrefs.getHudStyle(this)).coerceAtLeast(0))
         binding.switchVoiceProfile.isChecked = securePrefs.getBoolean(KEY_VOICE_PROFILE_ENABLED, false)
         binding.switchShowErrorDetails.isChecked = securePrefs.getBoolean(KEY_SHOW_ERROR_DETAILS, false)
         binding.switchNoisyEnv.isChecked = securePrefs.getBoolean(KEY_NOISY_ENV_MODE, false)
@@ -573,6 +594,15 @@ class SettingsActivity : FragmentActivity() {
             }
         }
 
+        binding.btnAccessibilitySettings.setOnClickListener {
+            try {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                Toast.makeText(this, "Installed apps → Voice Brain Access ကို ဖွင့်ပေးပါ", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Accessibility settings မဖွင့်နိုင်ပါ", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         binding.btnBatteryOptimization?.setOnClickListener {
             try {
                 val intent = Intent().apply {
@@ -773,6 +803,23 @@ class SettingsActivity : FragmentActivity() {
 
         if (!saved) { showSecureStorageUnavailable(); return }
         ThemeUtils.setTheme(this, theme)
+
+        val customPhrase = binding.etCustomWakePhrase.text.toString().trim()
+        WakeWordPrefs.setCustomPhrase(this, customPhrase)
+        val personas = WakeWordPrefs.AssistantPersona.entries
+        personas.getOrNull(binding.spinnerAssistantPersona.selectedItemPosition)?.let {
+            WakeWordPrefs.setPersona(this, it)
+        }
+        val hudStyles = WakeWordPrefs.HudStyle.entries
+        hudStyles.getOrNull(binding.spinnerHudStyle.selectedItemPosition)?.let {
+            WakeWordPrefs.setHudStyle(this, it)
+        }
+        if (WakeWordPrefs.isEnabled(this) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ) {
+            stopService(Intent(this, WakeWordListenerService::class.java))
+            startWakeWordService()
+        }
 
         Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
         finish()

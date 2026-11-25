@@ -75,4 +75,34 @@ class WakeWordMatcherTest {
         assertTrue(WakeWordMatcher.matchesFinalTranscript("\u101f\u1031\u1038 \u101c\u1030\u1019\u102c\u101b\u1015\u103a"))
         assertTrue(WakeWordMatcher.matchesFinalTranscript("hey luma\u101b\u1015\u103a"))
     }
+
+    @Test
+    fun acceptsJarvisAndFridayWakePhrases() {
+        assertTrue(WakeWordMatcher.matchesFinalTranscript("Hey Jarvis"))
+        assertTrue(WakeWordMatcher.matchesFinalTranscript("Jarvis"))
+        assertTrue(WakeWordMatcher.matchesFinalTranscript("ဟေး ဂျားဗစ်"))
+        assertTrue(WakeWordMatcher.matchesFinalTranscript("Hey Friday"))
+    }
+
+    @Test
+    fun extractsOneShotTrailingCommand() {
+        val enResult = WakeWordMatcher.matchWithCommand("Hey Jarvis, turn on flashlight")
+        assertTrue(enResult.matched)
+        org.junit.Assert.assertEquals("turn on flashlight", enResult.trailingCommand)
+
+        val myResult = WakeWordMatcher.matchWithCommand("ဟေး ဂျားဗစ် မနက် ၇ နာရီ နှိုးစက်ထားပေး")
+        assertTrue(myResult.matched)
+        org.junit.Assert.assertEquals("မနက် ၇ နာရီ နှိုးစက်ထားပေး", myResult.trailingCommand)
+    }
+
+    @Test
+    fun supportsCustomWakePhraseWithWordBoundary() {
+        val custom = "Hey Stark"
+        val match = WakeWordMatcher.matchWithCommand("Hey Stark check battery", customPhrase = custom)
+        assertTrue(match.matched)
+        org.junit.Assert.assertEquals("check battery", match.trailingCommand)
+
+        val embedded = WakeWordMatcher.matchWithCommand("Hey Starkness", customPhrase = custom)
+        assertFalse(embedded.matched)
+    }
 }
