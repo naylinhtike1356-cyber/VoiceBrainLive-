@@ -120,4 +120,61 @@ class AutonomousAgentEngineTest {
         assertEquals(listOf("get_current_time"), executed)
         assertEquals(AgentProgressBus.AgentPhase.CANCELLED, AgentProgressBus.state.value.phase)
     }
+
+    @Test
+    fun garminHealthCopilotOpensAppAndReadsScreenAndHealth() = runBlocking {
+        val calls = mutableListOf<String>()
+        val engine = AutonomousAgentEngine(
+            executeTool = { cmd, target, _ ->
+                calls += "$cmd:${target.orEmpty()}"
+                when (cmd) {
+                    "open_app" -> "Opened Garmin Connect"
+                    "read_screen_contents" -> "Steps: 8,420 | HR: 68 bpm | Sleep: 7h 15m"
+                    "get_health_summary" -> "Active today"
+                    else -> ""
+                }
+            },
+            publishProgress = true,
+            stepDelayMillis = 0L
+        )
+
+        val outcome = engine.runGoal("Garmin ဖွင့်ပြီး ကျန်းမာရေး စစ်ပေး")
+        assertTrue(outcome.success)
+        assertEquals(
+            listOf("open_app:Garmin Connect", "read_screen_contents:", "get_health_summary:"),
+            calls
+        )
+        assertTrue(outcome.summary.contains("8,420"))
+    }
+
+    @Test
+    fun iterativeScreenLoopObservesActsAndFinishes() = runBlocking {
+        var screenState = 0
+        val engine = AutonomousAgentEngine(
+            executeTool = { cmd, target, _ ->
+                when (cmd) {
+                    "read_screen_contents" -> if (screenState == 0) "[#1] Sleep" else "Sleep: 7h 45m | Score: 86"
+                    "click_text" -> {
+                        if (target == "Sleep") screenState = 1
+                        "Clicked $target"
+                    }
+                    else -> ""
+                }
+            },
+            publishProgress = true,
+            stepDelayMillis = 0L
+        )
+
+        val outcome = engine.runIterativeScreenLoop("Check Garmin Sleep") { _, screen, _, _ ->
+            if (screen.contains("Score: 86")) {
+                AutonomousAgentEngine.AgentLoopDecision.Finish("Sleep score is 86 (7h 45m).")
+            } else {
+                AutonomousAgentEngine.AgentLoopDecision.Act("Tap Sleep Tab", "click_text", target = "Sleep")
+            }
+        }
+
+        assertTrue(outcome.success)
+        assertTrue(outcome.summary.contains("Score is 86", ignoreCase = true))
+        assertEquals(AgentProgressBus.AgentPhase.COMPLETED, AgentProgressBus.state.value.phase)
+    }
 }

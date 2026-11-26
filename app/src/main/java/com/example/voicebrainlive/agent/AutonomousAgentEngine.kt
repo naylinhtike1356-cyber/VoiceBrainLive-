@@ -34,6 +34,17 @@ class AutonomousAgentEngine(
         val stepOutputs: List<String>
     )
 
+    sealed interface AgentLoopDecision {
+        data class Act(
+            val title: String,
+            val commandType: String,
+            val target: String? = null,
+            val value: String? = null
+        ) : AgentLoopDecision
+        data class Finish(val summary: String) : AgentLoopDecision
+        data class Abort(val reason: String) : AgentLoopDecision
+    }
+
     private val cancelled = AtomicBoolean(false)
 
     fun cancel() {
@@ -61,6 +72,7 @@ class AutonomousAgentEngine(
                 executePlan(cleanGoal.ifBlank { "Custom Agent Plan" }, parsed)
             }
             isMorningBriefGoal(lower) -> runMorningBrief(cleanGoal)
+            isGarminHealthGoal(lower) -> runGarminHealthCopilot(cleanGoal)
             isResearchToNotionGoal(lower) -> runResearchToNotion(cleanGoal)
             isScreenCopilotGoal(lower) -> runScreenCopilot(cleanGoal)
             else -> {
@@ -79,12 +91,88 @@ class AutonomousAgentEngine(
         }
     }
 
+    /**
+     * Iterative Observe -> Reason -> Act -> Verify loop for cross-app UI navigation.
+     * Halts immediately on cancellation or any NEEDS_APPROVAL / BLOCKED safety boundary.
+     */
+    suspend fun runIterativeScreenLoop(
+        goal: String,
+        maxSteps: Int = MAX_STEPS,
+        decideNextAction: suspend (goal: String, screenDump: String, stepIndex: Int, history: List<String>) -> AgentLoopDecision
+    ): AgentOutcome {
+        cancelled.set(false)
+        val boundedSteps = maxSteps.coerceIn(1, MAX_STEPS)
+        if (publishProgress) AgentProgressBus.beginPlanning(goal)
+        val history = mutableListOf<String>()
+        val outputs = mutableListOf<String>()
+        val uiSteps = mutableListOf<AgentProgressBus.AgentStepProgress>()
+
+        try {
+            for (stepIdx in 0 until boundedSteps) {
+                currentCoroutineContext().ensureActive()
+                if (cancelled.get()) return cancelledOutcome(outputs)
+
+                val screenDump = executeTool("read_screen_contents", null, null).orEmpty()
+                if (screenDump.contains("Accessibility", ignoreCase = true) && screenDump.contains("Settings", ignoreCase = true)) {
+                    if (publishProgress) AgentProgressBus.finish(AgentProgressBus.AgentPhase.FAILED, screenDump)
+                    return AgentOutcome(false, screenDump, outputs)
+                }
+
+                when (val decision = decideNextAction(goal, screenDump, stepIdx, history.toList())) {
+                    is AgentLoopDecision.Finish -> {
+                        if (publishProgress) AgentProgressBus.finish(AgentProgressBus.AgentPhase.COMPLETED, decision.summary)
+                        return AgentOutcome(true, decision.summary, outputs)
+                    }
+                    is AgentLoopDecision.Abort -> {
+                        if (publishProgress) AgentProgressBus.finish(AgentProgressBus.AgentPhase.FAILED, decision.reason)
+                        return AgentOutcome(false, decision.reason, outputs)
+                    }
+                    is AgentLoopDecision.Act -> {
+                        uiSteps += AgentProgressBus.AgentStepProgress(stepIdx, decision.title, decision.commandType, AgentProgressBus.StepStatus.RUNNING)
+                        if (publishProgress) AgentProgressBus.startSteps(goal, uiSteps.toList())
+
+                        val result = executeTool(decision.commandType, decision.target, decision.value).orEmpty()
+                        if (isApprovalOrBlocked(result)) {
+                            if (publishProgress) {
+                                AgentProgressBus.updateStep(stepIdx, AgentProgressBus.StepStatus.BLOCKED, result.take(120))
+                                AgentProgressBus.finish(AgentProgressBus.AgentPhase.FAILED, result)
+                            }
+                            outputs += result
+                            return AgentOutcome(false, result, outputs)
+                        }
+
+                        outputs += result
+                        history += "${decision.title}: $result"
+                        uiSteps[stepIdx] = uiSteps[stepIdx].copy(status = AgentProgressBus.StepStatus.DONE, detail = result.take(120))
+                        if (publishProgress) AgentProgressBus.updateStep(stepIdx, AgentProgressBus.StepStatus.DONE, result.take(120))
+                        if (stepDelayMillis > 0) delay(stepDelayMillis)
+                    }
+                }
+            }
+            val summary = history.lastOrNull() ?: "Reached max agent steps ($boundedSteps)."
+            if (publishProgress) AgentProgressBus.finish(AgentProgressBus.AgentPhase.COMPLETED, summary)
+            return AgentOutcome(true, summary, outputs)
+        } catch (ce: CancellationException) {
+            if (publishProgress) AgentProgressBus.finish(AgentProgressBus.AgentPhase.CANCELLED, "Cancelled")
+            throw ce
+        }
+    }
+
     suspend fun runMorningBrief(goalLabel: String = "Morning Executive Brief"): AgentOutcome {
         val steps = listOf(
             PlannedStep("Checking Weather", "get_weather", value = "today", optional = true),
             PlannedStep("Reading Today's Calendar", "get_calendar_events", value = "today", optional = true),
             PlannedStep("Checking Pending Reminders", "list_reminders", optional = true),
             PlannedStep("Reading Health Summary", "get_health_summary", optional = true)
+        )
+        return executePlan(goalLabel, steps, aggregateBrief = true)
+    }
+
+    suspend fun runGarminHealthCopilot(goalLabel: String = "Garmin Health Inspection"): AgentOutcome {
+        val steps = listOf(
+            PlannedStep("Opening Garmin Connect", "open_app", target = "Garmin Connect"),
+            PlannedStep("Reading Garmin Health Screen", "read_screen_contents", optional = true),
+            PlannedStep("Checking Health Connect Summary", "get_health_summary", optional = true)
         )
         return executePlan(goalLabel, steps, aggregateBrief = true)
     }
@@ -336,6 +424,12 @@ class AutonomousAgentEngine(
         (lower.contains("notion") || lower.contains("မှတ်စု") || lower.contains("save")) &&
             (lower.contains("search") || lower.contains("news") || lower.contains("research") ||
                 lower.contains("ရှာ") || lower.contains("သတင်း"))
+
+    private fun isGarminHealthGoal(lower: String): Boolean =
+        lower.contains("garmin") ||
+            lower.contains("ဂါမင်") ||
+            (lower.contains("health") && lower.contains("open")) ||
+            (lower.contains("ကျန်းမာရေး") && (lower.contains("ဖွင့်") || lower.contains("စစ်")))
 
     private fun isScreenCopilotGoal(lower: String): Boolean =
         lower.contains("screen") || lower.contains("စခရင်") || lower.contains("ဖန်သားပြင်")
